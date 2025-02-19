@@ -49,9 +49,12 @@ jobs:
               const prNumber = context.payload.pull_request.number;
               const fs = require('fs');
               const results = JSON.parse(fs.readFileSync('results.json', 'utf8'));
-              const highFindings = results.Issues.filter(issue => issue.extra.severity === 'WARNING' || issue.extra.severity === 'ERROR');
+
+              // Filter findings with 'WARNING' or 'ERROR' severity (inside extra.severity)
+              const highAndWarningFindings = results.filter(issue => issue.extra.severity === 'WARNING' || issue.extra.severity === 'ERROR');
+
               // Comment if high-severity findings are found
-              if (highFindings.length > 0) {
+              if (highAndWarningFindings.length > 0) {
                 const comment = `**Semgrep Findings:** Vulnerabilities are found in the code. Please address them before merging.`;
                 await github.rest.issues.createComment({
                   ...context.repo,
