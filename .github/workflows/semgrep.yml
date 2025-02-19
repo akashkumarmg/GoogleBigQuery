@@ -33,9 +33,16 @@ jobs:
          cat pretty-results.json
          
       - name: Check if vulnerabilities found
+        id: vulnerabilities
         run: |
            if grep -q '"severity": "WARNING"' pretty-results.json; then
              echo "Issues with Warning level severity are found, Please resolve the issues before merging."
+             echo "comment=Issues with Warning level severity are found, Please resolve the issues before merging." >> $GITHUB_ENV
            else
              echo "No Issues found, Good to merge."
+             echo "comment=No Issues found, Good to merge." >> $GITHUB_ENV
            fi
+
+      - name: Comment on PR
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} --body "${{ env.comment }}"
