@@ -32,7 +32,7 @@ jobs:
          echo "Displaying raw Semgrep results..."
          cat pretty-results.json
          
-      - name: Fail if error/critical vulnerabilities found
+      - name: Check if vulnerabilities found
         run: |
            if grep -q '"severity": "WARNING"' pretty-results.json; then
              echo "Issues with Warning level severity are found, Please resolve the issues before merging."
