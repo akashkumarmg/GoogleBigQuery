@@ -1,4 +1,4 @@
-name: Semgrep
+name: Semgrep-new
 
 on:
   pull_request:
@@ -20,16 +20,14 @@ jobs:
           sudo apt install python3-venv jq
           python3 -m venv .venv
           .venv/bin/pip install semgrep
-          
       - name: Run Semgrep
         run: |
           source .venv/bin/activate
           semgrep --config auto --severity ERROR --json-output=results.json --no-error
           cat results.json | jq .results > pretty-results.json
-          
-      - name: Display Semgrep JSON Output
+      - name: Display Raw Semgrep JSON Output
         run: |
-         echo "Displaying Semgrep results..."
+         echo "Displaying raw Semgrep results..."
          cat pretty-results.json
          
       - name: Add comment on PR if findings are found
@@ -38,14 +36,19 @@ jobs:
           script: |
             const fs = require('fs');
             const prNumber = context.payload.pull_request.number;
+            const severityLevel = 'WARNING';  // Modify this line to change the severity level (e.g., 'ERROR', 'INFO', 'WARNING')
+            
+            // Read and check for the specified severity
             const results = JSON.parse(fs.readFileSync('pretty-results.json', 'utf8'));
-            const criticalVulnsFound = results.some(result => result.severity === "ERROR");
+            const severityFound = results.some(result => result.severity === severityLevel);
+
             let comment;
-            if (criticalVulnsFound) {
-              comment = `**Semgrep Findings:** Critical vulnerabilities found in the code. Please address them before merging.`;
+            if (severityFound) {
+              comment = `**Semgrep Findings:** Issues with ${severityLevel} severity are found. Please resolve them before merging.`;
             } else {
-              comment = `**Semgrep Findings:** No vulnerabilities found. Good to merge!`;
+              comment = `**Semgrep Findings:** No ${severityLevel} severity issues found. Good to merge!`;
             }
+
             await github.rest.issues.createComment({
               ...context.repo,
               issue_number: prNumber,
