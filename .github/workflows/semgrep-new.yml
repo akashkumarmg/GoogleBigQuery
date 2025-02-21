@@ -28,9 +28,9 @@ jobs:
           semgrep --config auto --json-output=results.json --no-error
           cat results.json | jq .results > pretty-results.json
 		
-      - name: Display Semgrep JSON Output
+      - name: Display Raw Semgrep JSON Output
         run: |
-         echo "Displaying Semgrep results..."
+         echo "Displaying raw Semgrep results..."
          cat pretty-results.json
          
       - name: Check Semgrep Results and Add Comment on PR
@@ -51,7 +51,7 @@ jobs:
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
-            const comment = `**Semgrep Findings:** Critical vulnerabilities found in the code. Please address them before merging.`;
+            const comment = `**Semgrep Findings:** Vulnerabilities found in the code. Please address them before merging.`;
             await github.rest.issues.createComment({
               ...context.repo,
               issue_number: prNumber,
