@@ -1,4 +1,4 @@
-name: Semgrep-new
+name: Semgrep
 
 on:
   pull_request:
@@ -31,26 +31,19 @@ jobs:
          cat pretty-results.json
          
       - name: Add comment on PR if findings are found
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const fs = require('fs');
-            const prNumber = context.payload.pull_request.number;
-            const severityLevel = 'WARNING';  // Modify this line to change the severity level (e.g., 'ERROR', 'INFO', 'WARNING')
-            
-            // Read and check for the specified severity
-            const results = JSON.parse(fs.readFileSync('pretty-results.json', 'utf8'));
-            const severityFound = results.some(result => result.severity === severityLevel);
+        run: |
+          # Set the severity level dynamically (e.g., "WARNING", "ERROR", "INFO")
+          SEVERITY_LEVEL="WARNING"  # Modify this to adjust severity level, default is "WARNING"
 
-            let comment;
-            if (severityFound) {
-              comment = `**Semgrep Findings:** Issues with ${severityLevel} severity are found. Please resolve them before merging.`;
-            } else {
-              comment = `**Semgrep Findings:** No ${severityLevel} severity issues found. Good to merge!`;
-            }
+          # Search for the specified severity in the pretty-results.json file
+          if grep -q "\"severity\": \"$SEVERITY_LEVEL\"" pretty-results.json; then
+            echo "Semgrep findings: Issues with $SEVERITY_LEVEL level severity are found, Please resolve the issues before merging."
+            COMMENT="**Semgrep findings**: Issues with $SEVERITY_LEVEL level severity are found, Please resolve the issues before merging."
+          else
+            echo "No $SEVERITY_LEVEL level issues found, Good to merge."
+            COMMENT="**Semgrep findings**: No $SEVERITY_LEVEL level issues found, Good to merge."
+          fi
 
-            await github.rest.issues.createComment({
-              ...context.repo,
-              issue_number: prNumber,
-              body: comment
-            });
+          # Comment on the PR
+          prNumber=${{ github.event.pull_request.number }}
+          gh pr comment $prNumber --body "$COMMENT"
