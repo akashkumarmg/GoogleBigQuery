@@ -9,8 +9,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: read  # Adjusted to read permission for PRs
-      issues: write        # Write permission to add comments to PRs
+      pull-requests: write  # Write permission to add comments on PRs
+      issues: write         # Write permission to add comments to PRs
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -43,37 +43,33 @@ jobs:
               // Read the pretty JSON results
               const results = JSON.parse(fs.readFileSync('pretty-results.json', 'utf8'));
 
-              // Ensure results is an array before processing
-              if (Array.isArray(results)) {
-                // Filter high-severity findings (ERROR and WARNING)
-                const highFindings = results.filter(issue => issue.severity === 'ERROR' || issue.severity === 'WARNING');
+              // Initialize a count for severity levels
+              let severityCount = 0;
 
-                // Log the number of high-severity findings
-                console.log(`Found ${highFindings.length} high-severity findings.`);
-
-                // Prepare the PR comment body
-                let commentBody = '';
-                if (highFindings.length > 0) {
-                  // List the findings (file path and message)
-                  commentBody = `**Semgrep Findings:** Vulnerabilities are found in the following files:\n\n`;
-                  highFindings.forEach(issue => {
-                    commentBody += `- ${issue.path}: ${issue.extra.message}\n`;
-                  });
-                  commentBody += `\nPlease address them before merging.`;
-                } else {
-                  // If no high-severity issues found
-                  commentBody = "No issues found, good to merge.";
+              // Search for "severity" values in the JSON
+              results.forEach(issue => {
+                if (issue.severity === 'WARNING') {
+                  severityCount++;
                 }
+              });
 
-                // Add comment to the PR
-                await github.rest.issues.createComment({
-                  ...context.repo,
-                  issue_number: prNumber,
-                  body: commentBody
-                });
+              // Log the severity count
+              console.log(`Found ${severityCount} high-severity findings.`);
+
+              // Prepare the PR comment body
+              let commentBody = '';
+              if (severityCount > 0) {
+                commentBody = `**Semgrep Findings:** Vulnerabilities are found in the code. Please address them before merging.`;
               } else {
-                console.log("No results found or results are not an array.");
+                commentBody = "No issues found, good to merge.";
               }
+
+              // Add the comment to the PR
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: prNumber,
+                body: commentBody
+              });
             } else {
               console.log("This workflow wasn't triggered by a pull request, so no comment will be added.");
             }
