@@ -59,9 +59,9 @@ jobs:
               // Prepare the PR comment body
               let commentBody = '';
               if (severityCount > 0) {
-                commentBody = `**Semgrep Findings:** Vulnerabilities are found in the code. Please address them before merging.`;
+                commentBody = `**Semgrep-new Findings:** Vulnerabilities are found in the code. Please address them before merging.`;
               } else {
-                commentBody = "No issues found, good to merge.";
+                commentBody = "**Semgrep-new Findings:** No issues found, good to merge.";
               }
 
               // Add the comment to the PR
