@@ -54,7 +54,7 @@ jobs:
                   body: comment
                 });
               } else {
-                const noIssuesComment = "No issues found, Good to merge.";
+                const noIssuesComment = "**GoSec Findings:** No issues found, Good to merge.";
                 await github.rest.issues.createComment({
                   ...context.repo,
                   issue_number: prNumber,
