@@ -35,7 +35,7 @@ jobs:
         id: vulnerabilities
         run: |
            if grep -q '"severity": "ERROR"' pretty-results.json; then
-             echo "::set-output name=comment::**Semgrep-new findings**: Issues with Warning level severity are found, Please resolve the issues before merging."
+             echo "::set-output name=comment::**Semgrep-new findings**: Issues are found, Please resolve the issues before merging."
            else
              echo "::set-output name=comment::**Semgrep-new findings**: No Issues found, Good to merge."
            fi
