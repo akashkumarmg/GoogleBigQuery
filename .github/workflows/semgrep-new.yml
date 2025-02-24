@@ -31,44 +31,31 @@ jobs:
           echo "Displaying raw Semgrep results..."
           cat pretty-results.json
 
-      - name: Add comment on PR if findings are found
+      - name: Check if vulnerabilities found
+        id: vulnerabilities
+        run: |
+           if grep -q '"severity": "WARNING"' pretty-results.json; then
+             echo "Semgrep-new findings: Issues are found, Please resolve the issues before merging."
+             echo "comment=**Semgrep-new findings**: Issues are found, Please resolve the issues before merging."
+           else
+             echo "Semgrep-new findings: No Issues found, Good to merge."
+             echo "comment=**Semgrep-new findings**: No Issues found, Good to merge."
+           fi
+
+      - name: Add comment on PR
         uses: actions/github-script@v6
         with:
           script: |
             // Ensure the context has a pull_request
             if (context.payload.pull_request) {
               const prNumber = context.payload.pull_request.number;
-              const fs = require('fs');
+              const comment = '${{ steps.vulnerabilities.outputs.comment }}'; // Get comment from previous step
               
-              // Read the pretty JSON results
-              const results = JSON.parse(fs.readFileSync('pretty-results.json', 'utf8'));
-
-              // Initialize a count for severity levels
-              let severityCount = 0;
-
-              // Search for "severity" values in the JSON
-              results.forEach(issue => {
-                if (issue.severity === 'WARNING') {
-                  severityCount++;
-                }
-              });
-
-              // Log the severity count
-              console.log(`Found ${severityCount} high-severity findings.`);
-
-              // Prepare the PR comment body
-              let commentBody = '';
-              if (severityCount > 0) {
-                commentBody = `**Semgrep-new Findings:** Vulnerabilities are found in the code. Please address them before merging.`;
-              } else {
-                commentBody = "**Semgrep-new Findings:** No issues found, good to merge.";
-              }
-
               // Add the comment to the PR
               await github.rest.issues.createComment({
                 ...context.repo,
                 issue_number: prNumber,
-                body: commentBody
+                body: comment
               });
             } else {
               console.log("This workflow wasn't triggered by a pull request, so no comment will be added.");
