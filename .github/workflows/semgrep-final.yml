@@ -1,4 +1,4 @@
-name: Semgrep
+name: Semgrep-final
 
 on:
   pull_request:
@@ -41,7 +41,7 @@ jobs:
               const prNumber = context.payload.pull_request.number;
               const fs = require('fs');
               const results = JSON.parse(fs.readFileSync('pretty-results.json', 'utf8'));
-              const highFindings = results.filter(result => result.extra && result.extra.severity === 'WARNING');
+              const highFindings = results.filter(result => result.extra && result.extra.severity === 'ERROR');
 
               // Comment if findings exist
               if (highFindings.length > 0) {
