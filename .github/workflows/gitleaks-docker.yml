@@ -4,11 +4,11 @@ on:
   pull_request:
     branches:
       - main
-      
+
 jobs:
-  build:
+  scan:
     runs-on: ubuntu-latest
-      
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -16,10 +16,14 @@ jobs:
       - name: Run gitleaks-docker
         run: |
           docker pull zricethezav/gitleaks:latest
-          docker run -v ${{ github.workspace }}:/repo zricethezav/gitleaks:latest detect --source=/repo --verbose --exit-code=0 -f=json > gitleaks-results.json
-          cat gitleaks-results.json
-      
+          docker run \
+            -v ${{ github.workspace }}:/repo \
+            -e GITLEAKS_CONFIG=/repo/.github/gitleaks.toml \
+            zricethezav/gitleaks:latest \
+            detect --source=/repo --verbose --config=$GITLEAKS_CONFIG --exit-code=0 -f=json > gitleaks-results.json
+          echo "Gitleaks scan completed. Results saved to gitleaks-results.json"
+
       - name: Display Gitleaks JSON Output
         run: |
-         echo "Displaying Gitleaks results..."
-         cat gitleaks-results.json
+          echo "Displaying Gitleaks results..."
+          cat gitleaks-results.json
