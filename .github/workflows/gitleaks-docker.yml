@@ -19,8 +19,9 @@ jobs:
           docker run \
             -v ${{ github.workspace }}:/repo \
             -e GITLEAKS_CONFIG=/repo/.github/gitleaks.toml \
+            -e GITLEAKS_EXIT_CODE=0 \
             zricethezav/gitleaks:latest \
-            detect --source=/repo --verbose --config=$GITLEAKS_CONFIG --exit-code=0 -f=json > gitleaks-results.json
+            detect --source=/repo --verbose --config=$GITLEAKS_CONFIG -f=json > gitleaks-results.json
           echo "Gitleaks scan completed. Results saved to gitleaks-results.json"
 
       - name: Display Gitleaks JSON Output
