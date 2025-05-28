@@ -1,4 +1,4 @@
-name: Gitleaks Scan
+name: Gitleaks docker
 
 on:
   pull_request:
