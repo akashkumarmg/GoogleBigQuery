@@ -1,4 +1,4 @@
-name: gitleaks-docker
+name: gitleaks-docker-new
 
 on:
   pull_request:
