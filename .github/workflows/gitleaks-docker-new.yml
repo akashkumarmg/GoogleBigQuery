@@ -25,7 +25,6 @@ jobs:
             -e GITLEAKS_EXIT_CODE=0 \
             zricethezav/gitleaks:latest \
             detect --source=/repo --verbose --config=$GITLEAKS_CONFIG --report-format=json --report-path=/repo/gitleaks-results.json
-          echo "Gitleaks scan completed. Results saved to gitleaks-results.json"
 
       - name: Setup Python
         uses: actions/setup-python@v4
