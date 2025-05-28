@@ -1,4 +1,4 @@
-name: gitleaks-docker-new
+name: gitleaks-docker
 
 on:
   pull_request:
@@ -27,46 +27,18 @@ jobs:
             detect --source=/repo --verbose --config=$GITLEAKS_CONFIG -f=json > gitleaks-results.json
           echo "Gitleaks scan completed. Results saved to gitleaks-results.json"
 
-      - name: Display Gitleaks JSON Output
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
         run: |
-          echo "Displaying Gitleaks results..."
-          cat gitleaks-results.json
+          pip install pandas requests tabulate
 
-      - name: Convert JSON to table and comment on PR
+      - name: Run Python script
         run: |
-          pip install pandas tabulate requests
-          python -c "
-import pandas as pd
-from tabulate import tabulate
-import requests
-import os
-import json
-
-# Load JSON data
-with open('gitleaks-results.json') as f:
-    data = json.load(f)
-
-df = pd.json_normalize(data)
-
-# Convert to table format
-table = tabulate(df, headers='keys', tablefmt='psql')
-
-# Comment on PR using GitHub API
-token = os.environ['GITHUB_TOKEN']
-repo_owner = os.environ['GITHUB_REPOSITORY'].split('/')[0]
-repo_name = os.environ['GITHUB_REPOSITORY'].split('/')[1]
-pr_number = os.environ['PR_NUMBER']
-
-url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/issues/{pr_number}/comments'
-headers = {'Authorization': f'token {token}'}
-data = {'body': f'### Gitleaks Scan Results\n```\n{table}\n```'}
-response = requests.post(url, headers=headers, json=data)
-
-if response.status_code == 201:
-    print('Comment posted successfully!')
-else:
-    print('Failed to post comment:', response.text)
-          "
+          python gitleaks-result-convert-script.py
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.number }}
