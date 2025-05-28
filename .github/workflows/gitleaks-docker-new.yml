@@ -24,7 +24,7 @@ jobs:
             -e GITLEAKS_CONFIG=/repo/.github/gitleaks.toml \
             -e GITLEAKS_EXIT_CODE=0 \
             zricethezav/gitleaks:latest \
-            detect --source=/repo --verbose --config=$GITLEAKS_CONFIG -f=json > gitleaks-results.json
+            detect --source=/repo --verbose --config=$GITLEAKS_CONFIG --report-format=json --report-path=gitleaks-results.json
           echo "Gitleaks scan completed. Results saved to gitleaks-results.json"
 
       - name: Setup Python
@@ -32,12 +32,9 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install dependencies
+      - name: Install dependencies and Run Python script
         run: |
           pip install pandas requests tabulate
-
-      - name: Run Python script
-        run: |
           python gitleaks-result-convert-script.py
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
