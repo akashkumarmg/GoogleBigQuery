@@ -27,6 +27,7 @@ jobs:
             zricethezav/gitleaks:latest \
             detect --source=/repo --verbose --config=$GITLEAKS_CONFIG -f=json -r=./gitleaks-results.json
           echo "Gitleaks scan finihed"
+          cat ./gitleaks-results.json
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -35,7 +36,7 @@ jobs:
 
       - name: Install dependencies and Run Python script
         run: |
-          pip install pandas requests tabulate
+          pip install pandas requests tabulate openpyxl
           python gitleaks-result-convert-script.py
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
