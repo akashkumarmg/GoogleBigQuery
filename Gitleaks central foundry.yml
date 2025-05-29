@@ -1,0 +1,16 @@
+name: Gitleaks central foundry
+
+on:
+  pull_request:
+    branches:
+      - main
+      
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+  
+jobs:
+  call-gitleaks:
+    uses: akashkumarmg/git-central/.github/workflowsGitleaks Central workflow foundry.yml@main
+    secrets: inherit
