@@ -1,4 +1,4 @@
-name: Gitleaks scan workflow call on PR
+name: Gitleaks Central workflow foundry
 
 on:
   pull_request:
@@ -12,5 +12,5 @@ permissions:
 
 jobs:
   call-gitleaks:
-    uses: SkyflowFoundry/.github/.github/workflows/Gitleaks Central workflow foundry.yml@main
+    uses: akashkumarmg/git-central/.github/workflows/Gitleaks Central workflow foundry.yml@main
     secrets: inherit
