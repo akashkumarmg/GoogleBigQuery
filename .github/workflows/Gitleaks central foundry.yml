@@ -9,8 +9,6 @@ permissions:
   issues: write
   pull-requests: write
   contents: read
-env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   
 jobs:
   call-gitleaks:
