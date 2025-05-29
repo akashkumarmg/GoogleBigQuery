@@ -14,3 +14,4 @@ jobs:
   call-gitleaks:
     uses: akashkumarmg/git-central/.github/workflows/Gitleaks Central workflow foundry.yml@main
     secrets: inherit
+#1
