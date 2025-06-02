@@ -25,7 +25,6 @@ jobs:
         run: |
           mkdir -p .github
           curl -sSL -o .github/gitleaks.toml https://raw.githubusercontent.com/SkyflowFoundry/.github/main/.github/gitleaks.toml
-
       - name: Install Gitleaks
         run: |
           LATEST_VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | jq -r .tag_name | sed 's/^v//')
@@ -35,7 +34,6 @@ jobs:
           chmod +x gitleaks
           sudo mv gitleaks /usr/local/bin
           gitleaks version
-
       - name: Fetch main branch
         run: git fetch origin main
 
@@ -47,27 +45,22 @@ jobs:
             --exit-code=0 \
             --report-format=json \
             --report-path=main-results.json \
-            --commits=origin/main
-
+            --log-opts="origin/main"
           echo "🔎 Main branch scan results:"
           cat main-results.json | jq
-
       - name: Scan PR commits only
         run: |
           BASE_SHA=$(git merge-base origin/main HEAD)
           HEAD_SHA=$(git rev-parse HEAD)
-
           echo "🔍 Scanning PR commits: $BASE_SHA..$HEAD_SHA"
           gitleaks git \
             --config=.github/gitleaks.toml \
             --exit-code=0 \
             --report-format=json \
             --report-path=pr-results.json \
-            --commits="$BASE_SHA..$HEAD_SHA"
-
+            --log-opts="$BASE_SHA..$HEAD_SHA"
           echo "🔎 PR scan results:"
           cat pr-results.json | jq
-
       - name: Comment PR findings (only)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -102,11 +95,10 @@ jobs:
           else
             COMMENT="✅ **Gitleaks Findings:** No secrets detected in PR commits. Safe to proceed!"
           fi
-
           # Escape newlines for API
           COMMENT=$(echo "$COMMENT" | sed ':a;N;$!ba;s/\n/\\n/g')
           curl -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             -d "{\"body\":\"$COMMENT\"}" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments
