@@ -1,4 +1,4 @@
-name: Gitleaks secret scan
+name: Gitleaks scan new
 
 on:
   pull_request:
@@ -6,106 +6,59 @@ on:
       - main
 
 permissions:
-  contents: read
-  pull-requests: write
   issues: write
+  pull-requests: write
+  contents: read
 
 jobs:
-  gitleaks:
+  gitleaks-scan:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout PR code
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
 
-      - name: Set scan mode
-        id: scan
+      - name: Download gitleaks.toml
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            BASE="${{ github.event.pull_request.base.sha }}"
-            HEAD="${{ github.event.pull_request.head.sha }}"
-            echo "mode=pr" >> $GITHUB_OUTPUT
-            echo "logopts=$BASE..$HEAD" >> $GITHUB_OUTPUT
-          else
-            echo "mode=main" >> $GITHUB_OUTPUT
-            echo "logopts=" >> $GITHUB_OUTPUT  # No log opts = full scan of working dir
-          fi
-
-      - name: Run Gitleaks
-        env:
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS }}
+          mkdir -p .github
+          curl -sSL -o .github/gitleaks.toml https://raw.githubusercontent.com/SkyflowFoundry/.github/main/.github/gitleaks.toml
+      - name: Install Gitleaks
         run: |
-          echo "Pulling Gitleaks Docker image..."
-          docker pull zricethezav/gitleaks:latest
-
-          MODE="${{ steps.scan.outputs.mode }}"
-          LOG_OPTS="${{ steps.scan.outputs.logopts }}"
-
-          if [[ "$MODE" == "pr" ]]; then
-            echo "🔍 Scanning only the PR diff: $LOG_OPTS"
-            docker run --rm \
-              -v "${{ github.workspace }}:/repo" \
-              -e GITLEAKS_LICENSE=$GITLEAKS \
-              zricethezav/gitleaks:latest \
-              detect --source=/repo \
-              --log-opts="$LOG_OPTS" \
-              --report-format=json \
-              --report-path=/repo/gitleaks-results.json \
-              --exit-code=0 || true
-            cat gitleaks-results.json |jq
-          else
-            echo "🔍 Scanning full working directory of main branch (no history)"
-            docker run --rm \
-              -v "${{ github.workspace }}:/repo" \
-              -e GITLEAKS_LICENSE=$GITLEAKS \
-              zricethezav/gitleaks:latest \
-              detect --source=/repo --no-git \
-              --report-format=json \
-              --report-path=/repo/gitleaks-results.json \
-              --exit-code=0 || true
-            cat gitleaks-results.json |jq
-          fi
-
-      - name: Comment findings on PR
-        if: github.event_name == 'pull_request'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB }}
+          LATEST_VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | jq -r .tag_name | sed 's/^v//')
+          DOWNLOAD_URL="https://github.com/gitleaks/gitleaks/releases/download/v${LATEST_VERSION}/gitleaks_${LATEST_VERSION}_linux_x64.tar.gz"
+          curl -sSL "$DOWNLOAD_URL" -o gitleaks.tar.gz
+          tar -xzf gitleaks.tar.gz
+          chmod +x gitleaks
+          sudo mv gitleaks /usr/local/bin
+          gitleaks version
+      - name: Fetch main branch
+        run: git fetch origin main
+      - name: Scan full main branch
         run: |
-          FINDINGS_JSON=$(cat gitleaks-results.json)
-          COUNT=$(echo "$FINDINGS_JSON" | jq 'length')
-          SHA="${{ github.event.pull_request.head.sha }}"
-          REPO="${{ github.repository }}"
-          PR_NUMBER="${{ github.event.pull_request.number }}"
-          MAX=10
-          if [ "$COUNT" -gt 0 ]; then
-            COMMENT="**🔐 Gitleaks Findings: $COUNT issue(s) detected**\n\n"
-            i=0
-            while [ "$i" -lt "$COUNT" ] && [ "$i" -lt "$MAX" ]; do
-              ITEM=$(echo "$FINDINGS_JSON" | jq ".[$i]")
-              RULE=$(echo "$ITEM" | jq -r '.RuleID')
-              DESC=$(echo "$ITEM" | jq -r '.Description')
-              FILE=$(echo "$ITEM" | jq -r '.File')
-              LINE=$(echo "$ITEM" | jq -r '.Line')
-              LINK="https://github.com/$REPO/blob/$SHA/$FILE#L$LINE"
-              SECRET_MASKED="**********"
-              COMMENT+="🔸 **Rule**: \`$RULE\`\n"
-              COMMENT+="📄 **File**: \`$FILE:$LINE\`\n"
-              COMMENT+="📝 **Description**: $DESC\n"
-              COMMENT+="🔑 **Secret**: \`$SECRET_MASKED\`\n"
-              COMMENT+="🔗 **Path**: [$FILE:$LINE]($LINK)\n\n"
-              i=$((i + 1))
-            done
-            if [ "$COUNT" -gt "$MAX" ]; then
-              COMMENT+="...and more. Only showing first $MAX findings.\n"
-            fi
-          else
-            COMMENT="✅ **Gitleaks Findings:** No secrets detected. Safe to proceed!"
-          fi
-          COMMENT=$(echo "$COMMENT" | sed ':a;N;$!ba;s/\n/\\n/g')
-          curl -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            -d "{\"body\":\"$COMMENT\"}" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
+          echo "🔍 Scanning full main branch (for log visibility only)..."
+          gitleaks git \
+            --config=.github/gitleaks.toml \
+            --exit-code=0 \
+            --report-format=json \
+            --report-path=main-results.json \
+            --log-opts="origin/main"
+          echo "🔎 Main branch scan results:"
+          cat main-results.json | jq
+      - name: Scan PR commits only
+        run: |
+          BASE_SHA=$(git merge-base origin/main HEAD)
+          HEAD_SHA=$(git rev-parse HEAD)
+          echo "🔍 Scanning PR commits: $BASE_SHA..$HEAD_SHA"
+          gitleaks git \
+            --config=.github/gitleaks.toml \
+            --exit-code=0 \
+            --report-format=json \
+            --report-path=pr-results.json \
+            --log-opts="$BASE_SHA..$HEAD_SHA"
+          echo "🔎 PR scan results:"
+          cat pr-results.json
+      
+      - name: Format and comment findings on PR
