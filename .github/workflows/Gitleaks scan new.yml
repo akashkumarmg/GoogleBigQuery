@@ -58,7 +58,13 @@ jobs:
           HEAD_SHA=$(git rev-parse HEAD)
 
           echo "🔍 Scanning PR commits: $BASE_SHA..$HEAD_SHA"
-          gitleaks git --config=.github/gitleaks.toml --exit-code=0 --report-format=json --report-path=pr-results.json --commits="$BASE_SHA..$HEAD_SHA"
+          gitleaks git \
+            --config=.github/gitleaks.toml \
+            --exit-code=0 \
+            --report-format=json \
+            --report-path=pr-results.json \
+            --log-opts="$BASE_SHA..$HEAD_SHA"
+
           echo "🔎 PR scan results:"
           cat pr-results.json | jq
 
