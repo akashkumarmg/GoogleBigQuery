@@ -3,7 +3,7 @@ name: Gitleaks scan new
 on:
   pull_request:
     branches:
-      -main
+      - main
 
 permissions:
   issues: write
