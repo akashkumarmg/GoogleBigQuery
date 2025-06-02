@@ -41,9 +41,9 @@ jobs:
             BASE_SHA="${{ github.event.pull_request.base.sha }}"
             HEAD_SHA="${{ github.event.pull_request.head.sha }}"
             echo "Scanning changes between $BASE_SHA and $HEAD_SHA"
-            echo "log_opts=--log-opts=--patch=$BASE_SHA...$HEAD_SHA" >> $GITHUB_OUTPUT
+            echo "log_opts=--log-opts=$BASE_SHA..$HEAD_SHA" >> $GITHUB_OUTPUT
           else
-            echo "Scanning working tree only"
+            echo "Scanning recent commits (last 1 day)"
             echo "log_opts=--log-opts=--since=1.day" >> $GITHUB_OUTPUT
           fi
 
