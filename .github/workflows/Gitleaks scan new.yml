@@ -46,6 +46,7 @@ jobs:
             --report-format=json \
             --report-path=main-results.json \
             --log-opts="origin/main"
+            --log-opts="--since='2024-06-01'"
           echo "🔎 Main branch scan results:"
           cat main-results.json | jq
       - name: Scan PR commits only
@@ -59,6 +60,7 @@ jobs:
             --report-format=json \
             --report-path=pr-results.json \
             --log-opts="$BASE_SHA..$HEAD_SHA"
+            --log-opts="--since='2024-06-01'"
           echo "🔎 PR scan results:"
           cat pr-results.json
       
