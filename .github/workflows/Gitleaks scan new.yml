@@ -57,7 +57,7 @@ jobs:
               --report-format=json \
               --report-path=/repo/gitleaks-results.json \
               --exit-code=0 || true
-            cat /repo/gitleaks-results.json
+            cat gitleaks-results.json | jq
           else
             echo "🔍 Scanning full working directory of main branch (no history)"
             docker run --rm \
@@ -68,7 +68,7 @@ jobs:
               --report-format=json \
               --report-path=/repo/gitleaks-results.json \
               --exit-code=0 || true
-            cat /repo/gitleaks-results.json
+            cat gitleaks-results.json | jq
           fi
 
       - name: Comment findings on PR
