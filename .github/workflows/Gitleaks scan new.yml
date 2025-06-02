@@ -21,7 +21,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Required to compare branches in PRs
+          fetch-depth: 0
 
       - name: Set scan mode
         id: scan
@@ -29,10 +29,11 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             BASE="${{ github.event.pull_request.base.sha }}"
             HEAD="${{ github.event.pull_request.head.sha }}"
-            echo "mode=diff" >> $GITHUB_OUTPUT
-            echo "range=$BASE...$HEAD" >> $GITHUB_OUTPUT
+            echo "mode=pr" >> $GITHUB_OUTPUT
+            echo "logopts=$BASE..$HEAD" >> $GITHUB_OUTPUT
           else
             echo "mode=main" >> $GITHUB_OUTPUT
+            echo "logopts=" >> $GITHUB_OUTPUT  # No log opts = full scan of working dir
           fi
 
       - name: Run Gitleaks
@@ -43,24 +44,21 @@ jobs:
           docker pull zricethezav/gitleaks:latest
 
           MODE="${{ steps.scan.outputs.mode }}"
+          LOG_OPTS="${{ steps.scan.outputs.logopts }}"
 
-          if [[ "$MODE" == "diff" ]]; then
-            RANGE="${{ steps.scan.outputs.range }}"
-            echo "Running Gitleaks on diff: $RANGE"
-            git fetch origin main
-            git diff $RANGE > diff.patch
-
+          if [[ "$MODE" == "pr" ]]; then
+            echo "🔍 Scanning only the PR diff: $LOG_OPTS"
             docker run --rm \
               -v "${{ github.workspace }}:/repo" \
               -e GITLEAKS_LICENSE=$GITLEAKS \
               zricethezav/gitleaks:latest \
-              detect --source=/repo --patch=/repo/diff.patch \
+              detect --source=/repo \
+              --log-opts="$LOG_OPTS" \
               --report-format=json \
               --report-path=/repo/gitleaks-results.json \
               --exit-code=0 || true
-
           else
-            echo "Running Gitleaks on current state of main branch (no history)..."
+            echo "🔍 Scanning full working directory of main branch (no history)"
             docker run --rm \
               -v "${{ github.workspace }}:/repo" \
               -e GITLEAKS_LICENSE=$GITLEAKS \
