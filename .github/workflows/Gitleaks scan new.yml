@@ -1,9 +1,6 @@
 name: Gitleaks secret scan
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
@@ -57,7 +54,7 @@ jobs:
               --report-format=json \
               --report-path=/repo/gitleaks-results.json \
               --exit-code=0 || true
-            cat gitleaks-results.json | jq
+            cat gitleaks-results.json |jq
           else
             echo "🔍 Scanning full working directory of main branch (no history)"
             docker run --rm \
@@ -68,7 +65,7 @@ jobs:
               --report-format=json \
               --report-path=/repo/gitleaks-results.json \
               --exit-code=0 || true
-            cat gitleaks-results.json | jq
+            cat gitleaks-results.json |jq
           fi
 
       - name: Comment findings on PR
