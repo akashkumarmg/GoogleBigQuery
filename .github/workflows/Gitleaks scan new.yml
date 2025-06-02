@@ -1,72 +1,74 @@
-name: Gitleaks scan new
+name: Gitleaks secret scan
 
 on:
+  workflow_call:
   pull_request:
+    branches:
+      - main
+  push:
     branches:
       - main
 
 permissions:
-  issues: write
-  pull-requests: write
   contents: read
+  pull-requests: write
+  issues: write
 
 jobs:
-  gitleaks-scan:
+  gitleaks:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout PR code
+      - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0 # Required to access full git history for diff
 
-      - name: Download gitleaks.toml
-        run: |
-          mkdir -p .github
-          curl -sSL -o .github/gitleaks.toml https://raw.githubusercontent.com/SkyflowFoundry/.github/main/.github/gitleaks.toml
-      - name: Install Gitleaks
-        run: |
-          LATEST_VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | jq -r .tag_name | sed 's/^v//')
-          DOWNLOAD_URL="https://github.com/gitleaks/gitleaks/releases/download/v${LATEST_VERSION}/gitleaks_${LATEST_VERSION}_linux_x64.tar.gz"
-          curl -sSL "$DOWNLOAD_URL" -o gitleaks.tar.gz
-          tar -xzf gitleaks.tar.gz
-          chmod +x gitleaks
-          sudo mv gitleaks /usr/local/bin
-          gitleaks version
-      - name: Fetch main branch
-        run: git fetch origin main
-
-      - name: Scan full main branch
-        run: |
-          echo "🔍 Scanning full main branch (for log visibility only)..."
-          gitleaks git \
-            --config=.github/gitleaks.toml \
-            --exit-code=0 \
-            --report-format=json \
-            --report-path=main-results.json \
-            --log-opts="origin/main"
-          echo "🔎 Main branch scan results:"
-          cat main-results.json | jq
-      - name: Scan PR commits only
-        run: |
-          BASE_SHA=$(git merge-base origin/main HEAD)
-          HEAD_SHA=$(git rev-parse HEAD)
-          echo "🔍 Scanning PR commits: $BASE_SHA..$HEAD_SHA"
-          gitleaks git \
-            --config=.github/gitleaks.toml \
-            --exit-code=0 \
-            --report-format=json \
-            --report-path=pr-results.json \
-            --log-opts="$BASE_SHA..$HEAD_SHA"
-          echo "🔎 PR scan results:"
-          cat pr-results.json
-      
-      - name: Format and comment findings on PR
+      - name: Download gitleaks.toml config file
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.REPO }}
         run: |
-          FINDINGS_JSON=$(cat pr-results.json)
+          mkdir -p Rules
+          content=$(gh api -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/skyflowapi/.github-private/contents/Rules/gitleaks.toml --jq '.content')
+          echo "$content" | base64 -d > Rules/gitleaks.toml
+
+      - name: Determine Gitleaks Scan Range
+        id: scan_range
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+            echo "Scanning changes between $BASE_SHA and $HEAD_SHA"
+            echo "log_opts=--log-opts=--patch=$BASE_SHA...$HEAD_SHA" >> $GITHUB_OUTPUT
+          else
+            echo "Scanning working tree only"
+            echo "log_opts=--log-opts=--since=1.day" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Gitleaks Scan
+        env:
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS }}
+        run: |
+          echo "Pulling Gitleaks Docker image..."
+          docker pull zricethezav/gitleaks:latest
+          echo "Running Gitleaks scan with dynamic log_opts..."
+          docker run \
+            -v ${{ github.workspace }}:/repo \
+            -e GITLEAKS_CONFIG=/repo/Rules/gitleaks.toml \
+            -e GITLEAKS_LICENSE=$GITLEAKS \
+            zricethezav/gitleaks:latest \
+            detect --source=/repo --verbose --config=$GITLEAKS_CONFIG \
+            ${{ steps.scan_range.outputs.log_opts }} \
+            --exit-code=0 --report-format=json --report-path=/repo/gitleaks-results.json || true
+
+      - name: Format and comment findings on PR
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB }}
+        run: |
+          FINDINGS_JSON=$(cat gitleaks-results.json)
           COUNT=$(echo "$FINDINGS_JSON" | jq 'length')
           SHA="${{ github.event.pull_request.head.sha }}"
           REPO="${{ github.repository }}"
@@ -96,7 +98,6 @@ jobs:
           else
             COMMENT="✅ **Gitleaks Findings:** No secrets detected. Safe to proceed!"
           fi
-          # Escape newlines for GitHub API
           COMMENT=$(echo "$COMMENT" | sed ':a;N;$!ba;s/\n/\\n/g')
           curl -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
