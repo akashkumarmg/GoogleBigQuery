@@ -1,53 +1,87 @@
-import os
-import subprocess
-import sqlite3
-import hashlib
+package main
 
-# Vulnerability 1: Hardcoded credentials
-username = "admin"
-password = "mysecretpassword"
+import (
+	"crypto/md5"
+	"database/sql"
+	"fmt"
+	"log"
+	"net/http"
+	"os/exec"
 
-# Vulnerability 2: Insecure password hashing
-hashed_password = hashlib.md5(password.encode()).hexdigest()
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/dgrijalva/jwt-go"
+)
 
-# Vulnerability 3: SQL injection
-conn = sqlite3.connect("example.db")
-cursor = conn.cursor()
-user_input = "Robert'); DROP TABLE users; --"
-query = f"SELECT * FROM users WHERE name = '{user_input}'"
-cursor.execute(query)
+func main() {
+	// Vulnerability 1: Hardcoded credentials
+	username := "admin"
+	password := "mysecretpassword"
 
-# Vulnerability 4: Command injection
-subprocess.run(f"echo {user_input}", shell=True)
+	// Vulnerability 2: Insecure password hashing
+	hash := md5.Sum([]byte(password))
+	fmt.Println("Password hash:", hash)
 
-# Vulnerability 5: Insecure file permissions
-with open("sensitive_data.txt", "w") as f:
-    f.write("Top secret data")
+	// Vulnerability 3: SQL injection
+	db, err := sql.Open("mysql", "user:password@/dbname")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
 
-# Vulnerability 6: Insecure temporary file creation
-import tempfile
-tmp_file = tempfile.NamedTemporaryFile()
-tmp_file.write(b"sensitive data")
-tmp_file.close()
+	userInput := "Robert'); DROP TABLE users; --"
+	query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", userInput)
+	_, err = db.Exec(query)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-# Vulnerability 7: Potential path traversal vulnerability
-file_path = "../sensitive_data.txt"
-with open(file_path, "r") as f:
-    print(f.read())
+	// Vulnerability 4: Command injection
+	cmd := exec.Command("sh", "-c", "echo "+userInput)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(string(output))
 
-# Vulnerability 8: Insecure use of eval()
-eval(user_input)
+	// Vulnerability 5: Insecure JWT token signing
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"username": username,
+	})
+	tokenString, err := token.SignedString([]byte("secretkey"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("JWT token:", tokenString)
 
-# Vulnerability 9: Potential cross-site scripting (XSS) vulnerability
-print(f"<script>alert('{user_input}')</script>")
+	// Vulnerability 6: Insecure HTTP client
+	resp, err := http.Get("http://example.com")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
 
-# Vulnerability 10: Insecure use of pickle
-import pickle
-data = pickle.loads(b'x\x01\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00')
+	// Vulnerability 7: Missing HTTPS verification
+	httpClient := &http.Client{}
+	httpClient.Transport = &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
 
-# Additional vulnerabilities
-# Vulnerability 11: Insecure SSL/TLS configuration
-import ssl
-ssl_context = ssl.create_default_context()
-ssl_context.check_hostname = False
-ssl_context.verify_mode = ssl.CERT_NONE
+	// Vulnerability 8: Using vulnerable dependency
+	// github.com/dgrijalva/jwt-go is vulnerable to CVE-2020-26160
+}
+
+func processRequest(w http.ResponseWriter, r *http.Request) {
+	// Vulnerability 9: Potential cross-site scripting (XSS) vulnerability
+	fmt.Fprintf(w, "<script>alert('%s')</script>", r.URL.Query().Get("input"))
+}
+
+func insecureFileHandling() {
+	// Vulnerability 10: Potential path traversal vulnerability
+	filePath := "../sensitive_data.txt"
+	_, err := os.Open(filePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
