@@ -1,7 +1,9 @@
 name: Gitleaks scan new
 
 on:
-  workflow_call:
+  pull_request:
+    branches:
+      -main
 
 permissions:
   issues: write
