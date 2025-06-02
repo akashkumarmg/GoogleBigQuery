@@ -1,11 +1,10 @@
 name: Gitleaks secret scan
 
 on:
-  workflow_call:
-  pull_request:
+  push:
     branches:
       - main
-  push:
+  pull_request:
     branches:
       - main
 
@@ -22,11 +21,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0 # Required to access full git history for diff
+          fetch-depth: 0  # Required to compare branches in PRs
 
       - name: Download gitleaks.toml config file
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.REPO }}
         run: |
           mkdir -p Rules
           content=$(gh api -H "Accept: application/vnd.github+json" \
@@ -34,36 +33,59 @@ jobs:
             /repos/akashkumarmg/GoogleBigQuery/contents/.github/gitleaks.toml --jq '.content')
           echo "$content" | base64 -d > Rules/gitleaks.toml
 
-      - name: Determine Gitleaks Scan Range
-        id: scan_range
+      - name: Set scan mode
+        id: scan
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            BASE_SHA="${{ github.event.pull_request.base.sha }}"
-            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-            echo "Scanning changes between $BASE_SHA and $HEAD_SHA"
-            echo "log_opts=--log-opts=$BASE_SHA..$HEAD_SHA" >> $GITHUB_OUTPUT
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+            echo "mode=diff" >> $GITHUB_OUTPUT
+            echo "range=$BASE...$HEAD" >> $GITHUB_OUTPUT
           else
-            echo "Scanning recent commits (last 1 day)"
-            echo "log_opts=--log-opts=--since=1.day" >> $GITHUB_OUTPUT
+            echo "mode=main" >> $GITHUB_OUTPUT
           fi
 
-      - name: Run Gitleaks Scan
+      - name: Run Gitleaks
         env:
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS }}
         run: |
           echo "Pulling Gitleaks Docker image..."
           docker pull zricethezav/gitleaks:latest
-          echo "Running Gitleaks scan with dynamic log_opts..."
-          docker run \
-            -v ${{ github.workspace }}:/repo \
-            -e GITLEAKS_CONFIG=/repo/Rules/gitleaks.toml \
-            -e GITLEAKS_LICENSE=$GITLEAKS \
-            zricethezav/gitleaks:latest \
-            detect --source=/repo --verbose --config=$GITLEAKS_CONFIG \
-            ${{ steps.scan_range.outputs.log_opts }} \
-            --exit-code=0 --report-format=json --report-path=/repo/gitleaks-results.json || true
 
-      - name: Format and comment findings on PR
+          MODE="${{ steps.scan.outputs.mode }}"
+
+          if [[ "$MODE" == "diff" ]]; then
+            RANGE="${{ steps.scan.outputs.range }}"
+            echo "Running Gitleaks on diff: $RANGE"
+            git fetch origin main
+            git diff $RANGE > diff.patch
+
+            docker run --rm \
+              -v "${{ github.workspace }}:/repo" \
+              -e GITLEAKS_LICENSE=$GITLEAKS \
+              -e GITLEAKS_CONFIG=/repo/Rules/gitleaks.toml \
+              zricethezav/gitleaks:latest \
+              detect --source=/repo --patch=/repo/diff.patch \
+              --config=/repo/Rules/gitleaks.toml \
+              --report-format=json \
+              --report-path=/repo/gitleaks-results.json \
+              --exit-code=0 || true
+
+          else
+            echo "Running Gitleaks on current state of main branch (no history)..."
+            docker run --rm \
+              -v "${{ github.workspace }}:/repo" \
+              -e GITLEAKS_LICENSE=$GITLEAKS \
+              -e GITLEAKS_CONFIG=/repo/Rules/gitleaks.toml \
+              zricethezav/gitleaks:latest \
+              detect --source=/repo --no-git \
+              --config=/repo/Rules/gitleaks.toml \
+              --report-format=json \
+              --report-path=/repo/gitleaks-results.json \
+              --exit-code=0 || true
+          fi
+
+      - name: Comment findings on PR
         if: github.event_name == 'pull_request'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB }}
