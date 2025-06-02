@@ -42,7 +42,13 @@ jobs:
       - name: Scan full main branch
         run: |
           echo "🔍 Scanning full main branch (for log visibility only)..."
-          gitleaks git --config=.github/gitleaks.toml --exit-code=0 --report-format=json --report-path=main-results.json --commits=origin/main
+          gitleaks git \
+            --config=.github/gitleaks.toml \
+            --exit-code=0 \
+            --report-format=json \
+            --report-path=main-results.json \
+            --log-opts="origin/main"
+
           echo "🔎 Main branch scan results:"
           cat main-results.json | jq
 
