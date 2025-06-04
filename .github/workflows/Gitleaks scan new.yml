@@ -41,10 +41,11 @@ jobs:
           for file in $CHANGED_FILES; do
             if [ -f "$file" ]; then
               docker run \
-                -v ${{ github.workspace }}:/repo \
+                -v ${{ github.workspace }}:/app \
                 -e GITLEAKS_LICENSE=$GITLEAKS_LICENSE \
+                -w /app \
                 zricethezav/gitleaks:latest \
-                detect --source=/repo/$file --verbose  --exit-code=0 --report-format=json --report-path=/repo/gitleaks-results-$file.json || true
+                detect --source=$file --verbose  --exit-code=0 --report-format=json --report-path=/app/gitleaks-results-$file.json || true
             fi
           done
 
