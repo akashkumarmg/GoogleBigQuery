@@ -47,7 +47,7 @@ jobs:
 
       - name: Format and comment findings on PR
         env:
-          GITHUB_TOKEN: ${{ secrets.************* }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN}}
         run: |
           COMMENT="** Gitleaks Findings:**\n\n"
           for file in $CHANGED_FILES; do
