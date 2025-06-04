@@ -2,6 +2,7 @@ name: Gitleaks secret scan
 
 on:
   pull_request:
+    types: [opened, synchronize]
     branches:
       - main
 
@@ -17,68 +18,35 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Get changed files
-        id: changed-files
-        run: |
-          git fetch origin ${{ github.event.pull_request.base.sha }} 
-          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRTUXB ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
-          echo "Changed files: $CHANGED_FILES"
-          echo "changed_files<<EOF" >> $GITHUB_ENV
-          echo "$CHANGED_FILES" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
 
       - name: Run Gitleaks and Save Output
         env:
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE}}
-          CHANGED_FILES: ${{ env.changed_files }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Pulling Gitleaks Docker image..."
           docker pull zricethezav/gitleaks:latest
           echo "Running Gitleaks scan..."
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRTUXB ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
+          FINDINGS=""
           for file in $CHANGED_FILES; do
             if [ -f "$file" ]; then
               docker run \
-                -v ${{ github.workspace }}:/app \
+                -v ${{ github.workspace }}:/path \
                 -e GITLEAKS_LICENSE=$GITLEAKS_LICENSE \
-                -w /app \
                 zricethezav/gitleaks:latest \
-                detect --source=$file --verbose  --exit-code=0 --report-format=json --report-path=/app/gitleaks-results-$file.json || true
-            fi
-          done
-
-      - name: Format and comment findings on PR
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN}}
-        run: |
-          COMMENT="** Gitleaks Findings:**\n\n"
-          for file in $CHANGED_FILES; do
-            if [ -f "gitleaks-results-$file.json" ]; then
-              FINDINGS_JSON=$(cat gitleaks-results-$file.json)
-              COUNT=$(echo "$FINDINGS_JSON" | jq 'length')
-              if [ "$COUNT" -gt 0 ]; then
-                COMMENT+="**File: $file**\n"
-                i=0
-                while [ "$i" -lt "$COUNT" ]; do
-                  ITEM=$(echo "$FINDINGS_JSON" | jq ".[$i]")
-                  RULE=$(echo "$ITEM" | jq -r '.RuleID')
-                  DESC=$(echo "$ITEM" | jq -r '.Description')
-                  LINE=$(echo "$ITEM" | jq -r '.Line')
-                  LINK="https://github.com/${{ github.repository }}/blob/${{ github.event.pull_request.head.sha }}/$file#L$LINE"
-                  SECRET_MASKED="**********"
-                  COMMENT+="  - **Rule**: \`$RULE\`\n"
-                  COMMENT+="    **Description**: $DESC\n"
-                  COMMENT+="    **Line**: $LINE\n"
-                  COMMENT+="    **Secret**: \`$SECRET_MASKED\`\n"
-                  COMMENT+="    **Path**: [$file:$LINE]($LINK)\n\n"
-                  i=$((i + 1))
-                done
+                detect --source=/path/$file --verbose  --exit-code=0 --report-format=json | jq '.[] | .RuleID, .Description, .File, .Line' > findings.json || true
+              if [ -s findings.json ]; then
+                FINDINGS+="**File: $file**\n"
+                while IFS= read -r line; do
+                  FINDINGS+="$line\n"
+                done < findings.json
               fi
             fi
           done
-          if [ -z "$COMMENT" ] || [ "$COMMENT" = "** Gitleaks Findings:**\n\n" ]; then
+          if [ -n "$FINDINGS" ]; then
+            COMMENT="** Gitleaks Findings:**\n\n$FINDINGS"
+          else
             COMMENT="✅ **Gitleaks Findings:** No secrets detected. Safe to proceed!"
           fi
           COMMENT=$(echo "$COMMENT" | sed ':a;N;$!ba;s/\n/\\n/g')
