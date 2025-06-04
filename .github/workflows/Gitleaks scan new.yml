@@ -1,15 +1,17 @@
 name: Gitleaks secret scan
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
-    types: [opened, synchronize]
     branches:
       - main
 
 permissions:
-  issues: write
-  pull-requests: write
   contents: read
+  pull-requests: write
+  issues: write
 
 jobs:
   gitleaks:
@@ -18,34 +20,103 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Required to compare branches in PRs
 
-      - name: Run Gitleaks and Save Output
+      - name: Download gitleaks.toml config file
         env:
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.REPO }}
+        run: |
+          mkdir -p Rules
+          content=$(gh api -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/skyflowapi/.github-private/contents/Rules/gitleaks.toml --jq '.content')
+          echo "$content" | base64 -d > Rules/gitleaks.toml
+
+      - name: Set scan mode
+        id: scan
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+            echo "mode=diff" >> $GITHUB_OUTPUT
+            echo "range=$BASE...$HEAD" >> $GITHUB_OUTPUT
+          else
+            echo "mode=main" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Gitleaks
+        env:
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS }}
         run: |
           echo "Pulling Gitleaks Docker image..."
           docker pull zricethezav/gitleaks:latest
-          echo "Running Gitleaks scan..."
-          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRTUXB ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
-          FINDINGS=""
-          for file in $CHANGED_FILES; do
-            if [ -f "$file" ]; then
-              docker run \
-                -v ${{ github.workspace }}:/path \
-                -e GITLEAKS_LICENSE=$GITLEAKS_LICENSE \
-                zricethezav/gitleaks:latest \
-                detect --source=/path/$file --verbose  --exit-code=0 --report-format=json | jq '.[] | .RuleID, .Description, .File, .Line' > findings.json || true
-              if [ -s findings.json ]; then
-                FINDINGS+="**File: $file**\n"
-                while IFS= read -r line; do
-                  FINDINGS+="$line\n"
-                done < findings.json
-              fi
+
+          MODE="${{ steps.scan.outputs.mode }}"
+
+          if [[ "$MODE" == "diff" ]]; then
+            RANGE="${{ steps.scan.outputs.range }}"
+            echo "Running Gitleaks on diff: $RANGE"
+            git fetch origin main
+            git diff $RANGE > diff.patch
+
+            docker run --rm \
+              -v "${{ github.workspace }}:/repo" \
+              -e GITLEAKS_LICENSE=$GITLEAKS \
+              -e GITLEAKS_CONFIG=/repo/Rules/gitleaks.toml \
+              zricethezav/gitleaks:latest \
+              detect --source=/repo --patch=/repo/diff.patch \
+              --config=/repo/Rules/gitleaks.toml \
+              --report-format=json \
+              --report-path=/repo/gitleaks-results.json \
+              --exit-code=0 || true
+
+          else
+            echo "Running Gitleaks on current state of main branch (no history)..."
+            docker run --rm \
+              -v "${{ github.workspace }}:/repo" \
+              -e GITLEAKS_LICENSE=$GITLEAKS \
+              -e GITLEAKS_CONFIG=/repo/Rules/gitleaks.toml \
+              zricethezav/gitleaks:latest \
+              detect --source=/repo --no-git \
+              --config=/repo/Rules/gitleaks.toml \
+              --report-format=json \
+              --report-path=/repo/gitleaks-results.json \
+              --exit-code=0 || true
+          fi
+
+      - name: Comment findings on PR
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB }}
+        run: |
+          FINDINGS_JSON=$(cat gitleaks-results.json)
+          COUNT=$(echo "$FINDINGS_JSON" | jq 'length')
+          SHA="${{ github.event.pull_request.head.sha }}"
+          REPO="${{ github.repository }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          MAX=10
+          if [ "$COUNT" -gt 0 ]; then
+            COMMENT="**🔐 Gitleaks Findings: $COUNT issue(s) detected**\n\n"
+            i=0
+            while [ "$i" -lt "$COUNT" ] && [ "$i" -lt "$MAX" ]; do
+              ITEM=$(echo "$FINDINGS_JSON" | jq ".[$i]")
+              RULE=$(echo "$ITEM" | jq -r '.RuleID')
+              DESC=$(echo "$ITEM" | jq -r '.Description')
+              FILE=$(echo "$ITEM" | jq -r '.File')
+              LINE=$(echo "$ITEM" | jq -r '.Line')
+              LINK="https://github.com/$REPO/blob/$SHA/$FILE#L$LINE"
+              SECRET_MASKED="**********"
+              COMMENT+="🔸 **Rule**: \`$RULE\`\n"
+              COMMENT+="📄 **File**: \`$FILE:$LINE\`\n"
+              COMMENT+="📝 **Description**: $DESC\n"
+              COMMENT+="🔑 **Secret**: \`$SECRET_MASKED\`\n"
+              COMMENT+="🔗 **Path**: [$FILE:$LINE]($LINK)\n\n"
+              i=$((i + 1))
+            done
+            if [ "$COUNT" -gt "$MAX" ]; then
+              COMMENT+="...and more. Only showing first $MAX findings.\n"
             fi
-          done
-          if [ -n "$FINDINGS" ]; then
-            COMMENT="** Gitleaks Findings:**\n\n$FINDINGS"
           else
             COMMENT="✅ **Gitleaks Findings:** No secrets detected. Safe to proceed!"
           fi
