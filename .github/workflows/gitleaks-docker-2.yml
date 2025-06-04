@@ -28,17 +28,17 @@ jobs:
           echo "EOF" >> $GITHUB_ENV
 
       - name: Run Gitleaks and Save Output
-        env:
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
         run: |
-          echo "Pulling Gitleaks Docker image..."
-          docker pull zricethezav/gitleaks:latest
-          echo "Running Gitleaks scan..."
-          docker run \
-            -v ${{ github.workspace }}:/repo \
-            -e GITLEAKS_LICENSE=$GITLEAKS_LICENSE \
-            zricethezav/gitleaks:latest \
-            detect --source=/repo --verbose --exit-code=0 --report-format=json --report-path=/repo/gitleaks-results.json || true
+          git fetch origin main
+          for file in $(git diff --name-only --diff-filter=ACMRTUXB origin/main..${{ github.sha }}); do
+            echo "Scanning file: $file"
+            # Run Gitleaks on the file
+            docker run \
+              -v ${{ github.workspace }}:/repo \
+              -e GITLEAKS_LICENSE=$GITLEAKS_LICENSE \
+              zricethezav/gitleaks:latest \
+              detect --source=/repo/$file --verbose --exit-code=0 --report-format=json --report-path=/repo/gitleaks-results.json || true
+          done
 
       - name: Format and comment findings on PR
         env:
