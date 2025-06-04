@@ -20,17 +20,13 @@ jobs:
 
       - name: Get changed files
         run: |
-          git fetch origin main
-          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRTUXB origin/main..${{ github.sha }})
-          echo "Changed files: $CHANGED_FILES"
-          echo "CHANGED_FILES<<EOF" >> $GITHUB_ENV
-          echo "$CHANGED_FILES" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" | \
+            jq '.[].filename' > changed_files.txt
 
-      - name: Run Gitleaks and Save Output
+      - name: Run Gitleaks
         run: |
-          git fetch origin main
-          for file in $(git diff --name-only --diff-filter=ACMRTUXB origin/main..${{ github.sha }}); do
+          while IFS= read -r file; do
             echo "Scanning file: $file"
             # Run Gitleaks on the file
             docker run \
@@ -38,7 +34,7 @@ jobs:
               -e GITLEAKS_LICENSE=$GITLEAKS_LICENSE \
               zricethezav/gitleaks:latest \
               detect --source=/repo/$file --verbose --exit-code=0 --report-format=json --report-path=/repo/gitleaks-results.json || true
-          done
+          done < changed_files.txt
 
       - name: Format and comment findings on PR
         env:
