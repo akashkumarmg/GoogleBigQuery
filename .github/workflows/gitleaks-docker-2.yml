@@ -7,36 +7,44 @@ on:
 
 jobs:
   gitleaks:
-    name: Run Gitleaks on PR Diff
+    name: Run Gitleaks on PR Changes
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # full history for diffing
+          fetch-depth: 0  # required for diffing
 
-      - name: Get PR base and head
-        id: pr_info
+      - name: Set PR base and head SHA
+        id: sha
         run: |
           echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> $GITHUB_ENV
           echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
 
-      - name: Generate PR diff patch
+      - name: List changed files
+        id: changes
         run: |
-          git diff $BASE_SHA $HEAD_SHA > pr.patch
+          git diff --name-only $BASE_SHA $HEAD_SHA > changed_files.txt
+          cat changed_files.txt
 
-      - name: Run Gitleaks on patch diff (via Docker)
+      - name: Run Gitleaks via Docker on each changed file
         run: |
-          docker run --rm -v $(pwd):/path zricethezav/gitleaks:latest detect \
-            --source="/path" \
-            --log-opts="-p pr.patch" \
-            --report-path="/path/gitleaks-report.json" \
-            --exit-code=0
-          cat gitleaks-report.json
+          mkdir gitleaks-reports
+          exit_code=0
+          while IFS= read -r file; do
+            if [ -f "$file" ]; then
+              echo "Scanning $file"
+              docker run --rm -v $(pwd):/repo zricethezav/gitleaks:latest detect \
+                --source="/repo/$file" \
+                --report-path="/repo/gitleaks-reports/$(basename $file).json" \
+                --redact \
+                --exit-code=0 || true
+            fi
+          done < changed_files.txt
 
-      - name: Upload Gitleaks report
+      - name: Upload Gitleaks Reports
         uses: actions/upload-artifact@v4
         with:
-          name: gitleaks-report
-          path: gitleaks-report.json
+          name: gitleaks-reports
+          path: gitleaks-reports/
