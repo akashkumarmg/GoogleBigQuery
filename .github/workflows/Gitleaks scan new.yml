@@ -2,7 +2,7 @@ name: Gitleaks secret scan
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    - main
 
 permissions:
   issues: write
