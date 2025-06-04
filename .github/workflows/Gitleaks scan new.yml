@@ -1,14 +1,14 @@
-name: Gitleaks secret scan
+name: Gitleaks docker scan
 
 on:
-   pull_request:
+  pull_request:
     branches:
       - main
 
 permissions:
-  contents: read
-  pull-requests: write
   issues: write
+  pull-requests: write
+  contents: read
 
 jobs:
   gitleaks:
@@ -17,61 +17,23 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0  # Required to compare branches in PRs
 
-      - name: Set scan mode
-        id: scan
-        run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            BASE="${{ github.event.pull_request.base.sha }}"
-            HEAD="${{ github.event.pull_request.head.sha }}"
-            echo "mode=diff" >> $GITHUB_OUTPUT
-            echo "range=$BASE...$HEAD" >> $GITHUB_OUTPUT
-          else
-            echo "mode=main" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Run Gitleaks
+      - name: Run Gitleaks and Save Output
         env:
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
         run: |
           echo "Pulling Gitleaks Docker image..."
           docker pull zricethezav/gitleaks:latest
-
-          MODE="${{ steps.scan.outputs.mode }}"
-
-          if [[ "$MODE" == "diff" ]]; then
-            RANGE="${{ steps.scan.outputs.range }}"
-            echo "Running Gitleaks on diff: $RANGE"
-            git fetch origin main
-            git diff $RANGE > diff.patch
-
-            docker run --rm \
-              -v "${{ github.workspace }}:/repo" \
-              -e GITLEAKS_LICENSE=$GITLEAKS \
-              zricethezav/gitleaks:latest \
-              detect --source=/repo --patch=/repo/diff.patch \
-              --report-format=json \
-              --report-path=/repo/gitleaks-results.json \
-              --exit-code=0 || true
-
-          else
-            echo "Running Gitleaks on current state of main branch (no history)..."
-            docker run --rm \
-              -v "${{ github.workspace }}:/repo" \
-              -e GITLEAKS_LICENSE=$GITLEAKS \
-              zricethezav/gitleaks:latest \
-              detect --source=/repo --no-git \
-              --report-format=json \
-              --report-path=/repo/gitleaks-results.json \
-              --exit-code=0 || true
-          fi
-
-      - name: Comment findings on PR
-        if: github.event_name == 'pull_request'
+          echo "Running Gitleaks scan..."
+          docker run \
+            -v ${{ github.workspace }}:/repo \
+            -e GITLEAKS_LICENSE=$GITLEAKS_LICENSE \
+            zricethezav/gitleaks:latest \
+            detect --source=/repo --verbose --report-format=json --report-path=/repo/gitleaks-results.json || true
+            
+      - name: Format and comment findings on PR
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           FINDINGS_JSON=$(cat gitleaks-results.json)
           COUNT=$(echo "$FINDINGS_JSON" | jq 'length')
@@ -103,6 +65,7 @@ jobs:
           else
             COMMENT="✅ **Gitleaks Findings:** No secrets detected. Safe to proceed!"
           fi
+          # Escape newlines for GitHub API
           COMMENT=$(echo "$COMMENT" | sed ':a;N;$!ba;s/\n/\\n/g')
           curl -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
