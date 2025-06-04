@@ -5,84 +5,38 @@ on:
     branches:
       - main
 
-permissions:
-  issues: write
-  pull-requests: write
-  contents: read
-
 jobs:
   gitleaks:
+    name: Run Gitleaks on PR Diff
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for diffing
 
-      - name: Get changed files
+      - name: Get PR base and head
+        id: pr_info
         run: |
-          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" | \
-            jq '.[].filename' > changed_files.txt
+          echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> $GITHUB_ENV
+          echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
 
-      - name: Run Gitleaks
+      - name: Generate PR diff patch
         run: |
-          while IFS= read -r file; do
-            echo "Scanning file: $file"
-            # Run Gitleaks on the file
-            docker run \
-              -v ${{ github.workspace }}:/repo \
-              -e GITLEAKS_LICENSE=$GITLEAKS_LICENSE \
-              zricethezav/gitleaks:latest \
-              detect --source=/repo/$file --verbose --exit-code=0 --report-format=json --report-path=/repo/gitleaks-results.json || true
-          done < changed_files.txt
+          git diff $BASE_SHA $HEAD_SHA > pr.patch
 
-      - name: Format and comment findings on PR
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CHANGED_FILES: ${{ env.CHANGED_FILES }}
+      - name: Run Gitleaks on patch diff (via Docker)
         run: |
-          FINDINGS_JSON=$(cat gitleaks-results.json)
-          COUNT=$(echo "$FINDINGS_JSON" | jq 'length')
-          SHA="${{ github.event.pull_request.head.sha }}"
-          REPO="${{ github.repository }}"
-          PR_NUMBER="${{ github.event.pull_request.number }}"
-          MAX=10
-          COMMENT=""
-          i=0
-          for file in $CHANGED_FILES; do
-            FILE_FINDINGS=$(echo "$FINDINGS_JSON" | jq ".[] | select(.File == \"$file\")")
-            if [ ! -z "$FILE_FINDINGS" ]; then
-              if [ -z "$COMMENT" ]; then
-                COMMENT="** Gitleaks Findings: issue(s) detected**\n\n"
-              fi
-              COUNT=$(echo "$FILE_FINDINGS" | jq 'length')
-              j=0
-              while [ "$j" -lt "$COUNT" ] && [ "$j" -lt "$MAX" ]; do
-                ITEM=$(echo "$FILE_FINDINGS" | jq ".[$j]")
-                RULE=$(echo "$ITEM" | jq -r '.RuleID')
-                DESC=$(echo "$ITEM" | jq -r '.Description')
-                FILE=$(echo "$ITEM" | jq -r '.File')
-                LINE=$(echo "$ITEM" | jq -r '.Line')
-                LINK="https://github.com/$REPO/blob/$SHA/$FILE#L$LINE"
-                SECRET_MASKED="**********"
-                COMMENT+="**Rule**: \`$RULE\`\n"
-                COMMENT+="**File**: \`$FILE:$LINE\`\n"
-                COMMENT+="**Description**: $DESC\n"
-                COMMENT+="**Secret**: \`$SECRET_MASKED\`\n"
-                COMMENT+="**Path**: [$FILE:$LINE]($LINK)\n\n"
-                j=$((j + 1))
-              done
-              if [ "$COUNT" -gt "$MAX" ]; then
-                COMMENT+="...and more. Only showing first $MAX findings for $file.\n"
-              fi
-            fi
-          done
-          if [ -z "$COMMENT" ]; then
-            COMMENT="**Gitleaks Findings:** No secrets detected in changed files. Safe to proceed!"
-          fi
-          COMMENT=$(echo "$COMMENT" | sed ':a;N;$!ba;s/\n/\\n/g')
-          curl -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            -d "{\"body\":\"$COMMENT\"}" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
+          docker run --rm -v $(pwd):/path zricethezav/gitleaks:latest detect \
+            --source="/path" \
+            --log-opts="-p pr.patch" \
+            --report-path="/path/gitleaks-report.json" \
+            --exit-code=0
+          cat gitleaks-report.json
+
+      - name: Upload Gitleaks report
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
