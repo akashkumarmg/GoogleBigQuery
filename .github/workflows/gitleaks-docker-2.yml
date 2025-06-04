@@ -5,11 +5,6 @@ on:
     branches:
       - main
 
-permissions:
-  issues: write
-  pull-requests: write
-  contents: read
-
 jobs:
   gitleaks:
     runs-on: ubuntu-latest
@@ -18,7 +13,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Needed to access full commit diff
+          fetch-depth: 0  # Required to get full commit history for diffing
 
       - name: Get base and head commit SHAs
         run: |
@@ -33,7 +28,8 @@ jobs:
             --verbose \
             --exit-code=0 \
             --report-format=json \
-            --report-path="/repo/gitleaks-results.json"
+            --report-path="/repo/gitleaks-report.json" \
+            --redact
 
       - name: Upload Gitleaks report
         uses: actions/upload-artifact@v4
@@ -45,12 +41,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          if [ ! -f gitleaks-report.json ]; then
+            echo "Report file not found!"
+            exit 1
+          fi
+
           FINDINGS_JSON=$(cat gitleaks-report.json)
           COUNT=$(echo "$FINDINGS_JSON" | jq 'length')
           SHA="${{ github.event.pull_request.head.sha }}"
           REPO="${{ github.repository }}"
           PR_NUMBER="${{ github.event.pull_request.number }}"
           MAX=10
+
           if [ "$COUNT" -gt 0 ]; then
             COMMENT="**🔐 Gitleaks Findings: $COUNT issue(s) detected**\n\n"
             i=0
@@ -69,16 +71,19 @@ jobs:
               COMMENT+="🔗 **Path**: [$FILE:$LINE]($LINK)\n\n"
               i=$((i + 1))
             done
+
             if [ "$COUNT" -gt "$MAX" ]; then
               COMMENT+="...and more. Only showing first $MAX findings.\n"
             fi
           else
             COMMENT="✅ **Gitleaks Findings:** No secrets detected. Safe to proceed!"
           fi
+
           # Escape newlines for GitHub API
           COMMENT=$(echo "$COMMENT" | sed ':a;N;$!ba;s/\n/\\n/g')
+
           curl -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             -d "{\"body\":\"$COMMENT\"}" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
+            "https://api.github.com/repos/${REPO}/issues/${PR_NUMBER}/comments"
