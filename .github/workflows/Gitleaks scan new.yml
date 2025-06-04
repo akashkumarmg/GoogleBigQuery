@@ -24,25 +24,17 @@ jobs:
         run: |
           echo "Base SHA: ${{ github.event.pull_request.base.sha }}"
           echo "Head SHA: ${{ github.event.pull_request.head.sha }}"
-          echo "Base Ref: ${{ github.event.pull_request.base.ref }}"
-          echo "Head Ref: ${{ github.event.pull_request.head.ref }}"
-
-      - name: Fetch Base Branch
-        run: |
-          git fetch origin ${{ github.event.pull_request.base.ref }}
 
       - name: Run Gitleaks and Save Output
         env:
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
         run: |
-          echo "Running Gitleaks scan..."
-          git diff -U0 ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | \
+          docker pull zricethezav/gitleaks:latest
           docker run \
-            -i \
-            -e GITLEAKS_LICENSE=$GITLEAKS_LICENSE \
             -v ${{ github.workspace }}:/repo \
+            -e GITLEAKS_LICENSE=$GITLEAKS_LICENSE \
             zricethezav/gitleaks:latest \
-            detect --source=/dev/stdin --verbose --report-format=json --report-path=/repo/gitleaks-results.json || true
+            detect --source=/repo --verbose --report-format=json --report-path=/repo/gitleaks-results.json --log-level=info
 
       - name: Format and comment findings on PR
         env:
