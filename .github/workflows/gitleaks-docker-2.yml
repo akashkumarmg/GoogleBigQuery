@@ -20,8 +20,8 @@ jobs:
 
       - name: Get changed files
         run: |
-          git fetch origin ${{ github.base_ref }} 
-          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRTUXB ${{ github.base_ref }}..${{ github.sha }})
+          git fetch origin main
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRTUXB origin/main..${{ github.sha }})
           echo "Changed files: $CHANGED_FILES"
           echo "CHANGED_FILES=$CHANGED_FILES" >> $GITHUB_ENV
 
