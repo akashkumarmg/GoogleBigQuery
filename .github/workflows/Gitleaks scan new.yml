@@ -1,9 +1,8 @@
-name: Gitleaks scan new
+name: Gitleaks secret scan
 
 on:
   pull_request:
-    branches:
-      - main
+    types: [opened, synchronize]
 
 permissions:
   issues: write
@@ -11,94 +10,73 @@ permissions:
   contents: read
 
 jobs:
-  gitleaks-scan:
+  gitleaks:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout PR code
+      - name: Checkout code
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.ref }}
 
-      - name: Download gitleaks.toml
+      - name: Get changed files
+        id: changed-files
         run: |
-          mkdir -p .github
-          curl -sSL -o .github/gitleaks.toml https://raw.githubusercontent.com/SkyflowFoundry/.github/main/.github/gitleaks.toml
-      - name: Install Gitleaks
+          git fetch origin ${{ github.event.pull_request.base.sha }} 
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRTUXB ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
+          echo "Changed files: $CHANGED_FILES"
+          echo "changed_files=$CHANGED_FILES" >> $GITHUB_ENV
+
+      - name: Run Gitleaks and Save Output
+        env:
+          GITLEAKS_LICENSE: ${{ secrets.*********** }}
+          CHANGED_FILES: ${{ env.changed_files }}
         run: |
-          LATEST_VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | jq -r .tag_name | sed 's/^v//')
-          DOWNLOAD_URL="https://github.com/gitleaks/gitleaks/releases/download/v${LATEST_VERSION}/gitleaks_${LATEST_VERSION}_linux_x64.tar.gz"
-          curl -sSL "$DOWNLOAD_URL" -o gitleaks.tar.gz
-          tar -xzf gitleaks.tar.gz
-          chmod +x gitleaks
-          sudo mv gitleaks /usr/local/bin
-          gitleaks version
-          
-      - name: Fetch main branch
-        run: git fetch origin main
-        
-      - name: Scan full main branch
-        run: |
-          echo "🔍 Scanning full main branch (for log visibility only)..."
-          gitleaks git \
-            --config=.github/gitleaks.toml \
-            --exit-code=0 \
-            --report-format=json \
-            --report-path=main-results.json \
-            --log-opts="origin/main"
-          echo "🔎 Main branch scan results:"
-          cat main-results.json | jq
-          
-      - name: Scan PR commits only
-        run: |
-          BASE_SHA=$(git merge-base origin/main HEAD)
-          HEAD_SHA=$(git rev-parse HEAD)
-          echo "🔍 Scanning PR commits: $BASE_SHA..$HEAD_SHA"
-          gitleaks git \
-            --config=.github/gitleaks.toml \
-            --exit-code=0 \
-            --report-format=json \
-            --report-path=pr-results.json \
-            --log-opts="$BASE_SHA..$HEAD_SHA"
-          echo "🔎 PR scan results:"
-          cat pr-results.json
-      
+          echo "Pulling Gitleaks Docker image..."
+          docker pull zricethezav/gitleaks:latest
+          echo "Running Gitleaks scan..."
+          for file in $CHANGED_FILES; do
+            if [ -f "$file" ]; then
+              docker run \
+                -v ${{ github.workspace }}:/repo \
+                -e GITLEAKS_LICENSE=$GITLEAKS_LICENSE \
+                zricethezav/gitleaks:latest \
+                detect --source=/repo/$file --verbose  --exit-code=0 --report-format=json --report-path=/repo/gitleaks-results-$file.json || true
+            fi
+          done
+
       - name: Format and comment findings on PR
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.************* }}
         run: |
-          FINDINGS_JSON=$(cat pr-results.json)
-          COUNT=$(echo "$FINDINGS_JSON" | jq 'length')
-          SHA="${{ github.event.pull_request.head.sha }}"
-          REPO="${{ github.repository }}"
-          PR_NUMBER="${{ github.event.pull_request.number }}"
-          MAX=10
-          if [ "$COUNT" -gt 0 ]; then
-            COMMENT="**🔐 Gitleaks Findings: $COUNT issue(s) detected**\n\n"
-            i=0
-            while [ "$i" -lt "$COUNT" ] && [ "$i" -lt "$MAX" ]; do
-              ITEM=$(echo "$FINDINGS_JSON" | jq ".[$i]")
-              RULE=$(echo "$ITEM" | jq -r '.RuleID')
-              DESC=$(echo "$ITEM" | jq -r '.Description')
-              FILE=$(echo "$ITEM" | jq -r '.File')
-              LINE=$(echo "$ITEM" | jq -r '.Line')
-              LINK="https://github.com/$REPO/blob/$SHA/$FILE#L$LINE"
-              SECRET_MASKED="**********"
-              COMMENT+="🔸 **Rule**: \`$RULE\`\n"
-              COMMENT+="📄 **File**: \`$FILE:$LINE\`\n"
-              COMMENT+="📝 **Description**: $DESC\n"
-              COMMENT+="🔑 **Secret**: \`$SECRET_MASKED\`\n"
-              COMMENT+="🔗 **Path**: [$FILE:$LINE]($LINK)\n\n"
-              i=$((i + 1))
-            done
-            if [ "$COUNT" -gt "$MAX" ]; then
-              COMMENT+="...and more. Only showing first $MAX findings.\n"
+          COMMENT="** Gitleaks Findings:**\n\n"
+          for file in $CHANGED_FILES; do
+            if [ -f "gitleaks-results-$file.json" ]; then
+              FINDINGS_JSON=$(cat gitleaks-results-$file.json)
+              COUNT=$(echo "$FINDINGS_JSON" | jq 'length')
+              if [ "$COUNT" -gt 0 ]; then
+                COMMENT+="**File: $file**\n"
+                i=0
+                while [ "$i" -lt "$COUNT" ]; do
+                  ITEM=$(echo "$FINDINGS_JSON" | jq ".[$i]")
+                  RULE=$(echo "$ITEM" | jq -r '.RuleID')
+                  DESC=$(echo "$ITEM" | jq -r '.Description')
+                  LINE=$(echo "$ITEM" | jq -r '.Line')
+                  LINK="https://github.com/${{ github.repository }}/blob/${{ github.event.pull_request.head.sha }}/$file#L$LINE"
+                  SECRET_MASKED="**********"
+                  COMMENT+="  - **Rule**: \`$RULE\`\n"
+                  COMMENT+="    **Description**: $DESC\n"
+                  COMMENT+="    **Line**: $LINE\n"
+                  COMMENT+="    **Secret**: \`$SECRET_MASKED\`\n"
+                  COMMENT+="    **Path**: [$file:$LINE]($LINK)\n\n"
+                  i=$((i + 1))
+                done
+              fi
             fi
-          else
+          done
+          if [ -z "$COMMENT" ] || [ "$COMMENT" = "** Gitleaks Findings:**\n\n" ]; then
             COMMENT="✅ **Gitleaks Findings:** No secrets detected. Safe to proceed!"
           fi
-          # Escape newlines for GitHub API
           COMMENT=$(echo "$COMMENT" | sed ':a;N;$!ba;s/\n/\\n/g')
           curl -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
