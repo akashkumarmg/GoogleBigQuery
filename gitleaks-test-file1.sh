@@ -14,3 +14,6 @@ SENSITIVE_SERVER="192.168.1.100"
 
 # Using curl with insecure SSL verification (Vulnerability 5)
 curl -k -X GET "https://example.com/api/data"
+
+
+SKYFLOW_API_KEY = sky-x55a9-a0ba2b9f53f84ef080e481e59f1ea2c6
