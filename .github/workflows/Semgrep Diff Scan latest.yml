@@ -29,7 +29,7 @@ jobs:
           . .venv/bin/activate
           pip install semgrep
 
-          semgrep --config auto --severity ERROR --json-output=main_branch_results.json
+          semgrep --config auto --json-output=main_branch_results.json
           cat main_branch_results.json | jq .results > pretty-main_branch_results.json
 
           echo "MAIN_BRANCH_COMMIT_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
@@ -57,7 +57,7 @@ jobs:
           . .venv/bin/activate
           pip install semgrep
 
-          semgrep --config auto --baseline-commit "$BASELINE_SHA" --severity ERROR --json-output=pr_branch_results.json
+          semgrep --config auto --baseline-commit "$BASELINE_SHA" --json-output=pr_branch_results.json
           cat pr_branch_results.json | jq .results > pretty-pr_branch_results.json
 
       - name: Display new findings and Comment on PR Findings
@@ -67,7 +67,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_SHA: ${{ env.PR_SHA }}
         run: |
-          PR_FINDINGS=$(jq '[.[] | select(.extra.severity == "ERROR")]' pretty-pr_branch_results.json)
+          PR_FINDINGS=$(jq '[.[] | select(.extra.severity == "WARNING")]' pretty-pr_branch_results.json)
           COUNT=$(echo "$PR_FINDINGS" | jq 'length')
           echo "Total findings: $COUNT"
 
