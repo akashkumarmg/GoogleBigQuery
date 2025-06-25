@@ -29,8 +29,7 @@ jobs:
             -v ${{ github.workspace }}:/repo \
             -e GITLEAKS_LICENSE=$GITLEAKS_LICENSE \
             zricethezav/gitleaks:latest \
-            detect --source=/repo --verbose --exit-code=0 --report-format=json --report-path=gitleaks-results.json || true
-          cat gitleaks-results.json
+            detect --source=/repo --verbose --exit-code=0 --report-format=json --report-path=/repo/gitleaks-results.json || true
             
       - name: Format and comment findings on PR
         env:
@@ -43,14 +42,14 @@ jobs:
           PR_NUMBER="${{ github.event.pull_request.number }}"
           MAX=10
           if [ "$COUNT" -gt 0 ]; then
-            COMMENT="**🔐 Gitleaks docker Findings: $COUNT issue(s) detected**\n\n"
+            COMMENT="**🔐 Gitleaks Findings: $COUNT issue(s) detected**\n\n"
             i=0
             while [ "$i" -lt "$COUNT" ] && [ "$i" -lt "$MAX" ]; do
               ITEM=$(echo "$FINDINGS_JSON" | jq ".[$i]")
               RULE=$(echo "$ITEM" | jq -r '.RuleID')
               DESC=$(echo "$ITEM" | jq -r '.Description')
               FILE=$(echo "$ITEM" | jq -r '.File')
-              LINE=$(echo "$ITEM" | jq -r '.StartLine // "unknown"')
+              LINE=$(echo "$ITEM" | jq -r '.Line')
               LINK="https://github.com/$REPO/blob/$SHA/$FILE#L$LINE"
               SECRET_MASKED="**********"
               COMMENT+="🔸 **Rule**: \`$RULE\`\n"
