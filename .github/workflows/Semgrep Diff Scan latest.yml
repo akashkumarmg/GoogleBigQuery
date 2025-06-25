@@ -67,7 +67,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_SHA: ${{ env.PR_SHA }}
         run: |
-          PR_FINDINGS=$(jq '[.[] | select(.extra.severity == "WARNING")]' pretty-pr_branch_results.json)
+          PR_FINDINGS=$(jq '[.[] | select(.extra.severity == "ERROR")]' pretty-pr_branch_results.json)
           COUNT=$(echo "$PR_FINDINGS" | jq 'length')
           echo "Total findings: $COUNT"
 
