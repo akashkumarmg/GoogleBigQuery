@@ -51,7 +51,7 @@ jobs:
               RULE=$(echo "$ITEM" | jq -r '.RuleID')
               DESC=$(echo "$ITEM" | jq -r '.Description')
               FILE=$(echo "$ITEM" | jq -r '.File')
-              LINE=$(echo "$ITEM" | jq -r '.Line')
+              LINE=$(echo "$ITEM" | jq -r '.StartLine // "unknown"')
               LINK="https://github.com/$REPO/blob/$SHA/$FILE#L$LINE"
               SECRET_MASKED="**********"
               COMMENT+="🔸 **Rule**: \`$RULE\`\n"
