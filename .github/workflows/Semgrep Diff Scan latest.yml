@@ -1,0 +1,132 @@
+name: Semgrep Diff Scan new 
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Main Branch
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          ref: main
+
+      - name: Scan Main Branch
+        run: |
+          sudo apt install -y python3-venv jq
+          python3 -m venv .venv
+          . .venv/bin/activate
+          pip install semgrep
+
+          semgrep --config auto --severity ERROR --json-output=main_branch_results.json
+          cat main_branch_results.json | jq .results > pretty-main_branch_results.json
+
+          echo "MAIN_BRANCH_COMMIT_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
+
+      - name: Display Main Branch Findings
+        run: cat pretty-main_branch_results.json
+
+      - name: Checkout PR Branch
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Get PR SHA
+        run: echo "PR_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
+
+      - name: Scan PR Branch with Baseline Commit (Diff-Aware)
+        env:
+          BASELINE_SHA: ${{ env.MAIN_BRANCH_COMMIT_SHA }}
+        run: |
+          echo "Using baseline commit: $BASELINE_SHA"
+
+          sudo apt install -y python3-venv jq
+          python3 -m venv .venv
+          . .venv/bin/activate
+          pip install semgrep
+
+          semgrep --config auto --baseline-commit "$BASELINE_SHA" --severity ERROR --json-output=pr_branch_results.json
+          cat pr_branch_results.json | jq .results > pretty-pr_branch_results.json
+
+      - name: Display new findings and Comment on PR Findings
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_SHA: ${{ env.PR_SHA }}
+        run: |
+          PR_FINDINGS=$(jq '[.[] | select(.extra.severity == "ERROR")]' pretty-pr_branch_results.json)
+          COUNT=$(echo "$PR_FINDINGS" | jq 'length')
+          echo "Total findings: $COUNT"
+
+          COMMENT_FILE="semgrep_comment.md"
+          echo "" > "$COMMENT_FILE"
+
+          if [ "$COUNT" -eq 0 ]; then
+            echo "**Semgrep Findings:** ✅ No new issues introduced. Safe to merge." > "$COMMENT_FILE"
+          else
+            echo "### 🛡️ Semgrep Findings — $COUNT issue(s) found" >> "$COMMENT_FILE"
+            echo -e "\nShowing first 3 findings below. [Download full JSON report to view all findings from Artifacts in summary.]\n\n---" >> "$COMMENT_FILE"
+
+            FINDINGS_ARRAY=$(echo "$PR_FINDINGS" | jq -c '.')
+            MAX_DISPLAY=3
+            DISPLAY_COUNT=$((COUNT < MAX_DISPLAY ? COUNT : MAX_DISPLAY))
+
+            for ((i = 0; i < DISPLAY_COUNT; i++)); do
+              finding=$(echo "$FINDINGS_ARRAY" | jq -c ".[$i]")
+
+              SEVERITY=$(echo "$finding" | jq -r '.extra.severity')
+              FILE=$(echo "$finding" | jq -r '.path')
+              LINE=$(echo "$finding" | jq -r '.start.line')
+              MSG=$(echo "$finding" | jq -r '.extra.message')
+              RULE_LINK=$(echo "$finding" | jq -r '.extra.metadata.source')
+
+              if [ "$RULE_LINK" == "null" ]; then
+                RULE_LINK=$(echo "$finding" | jq -r '.extra.metadata.shortlink')
+                if [ "$RULE_LINK" == "null" ]; then
+                  RULE_LINK="https://semgrep.dev/r/$(echo "$finding" | jq -r '.check_id')"
+                fi
+              fi
+
+              LINK_TO_FILE="https://github.com/$REPO/blob/$PR_SHA/$FILE#L$LINE"
+
+              {
+                echo ""
+                echo "#### ⚠️ Issue $((i+1)) — $SEVERITY"
+                echo ""
+                echo "📄 \`$FILE:$LINE\`"
+                echo "🔗 [View in PR]($LINK_TO_FILE)"
+                echo "📘 [Rule Documentation]($RULE_LINK)"
+                echo "💬 _\"$MSG\"_"
+                echo ""
+                echo "---"
+              } >> "$COMMENT_FILE"
+            done
+          fi
+
+          echo "Final Comment Preview:"
+          cat "$COMMENT_FILE"
+
+          curl -s -X POST \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -d "$(jq -n --rawfile body "$COMMENT_FILE" '{body: $body}')" \
+            "https://api.github.com/repos/$REPO/issues/$PR_NUMBER/comments"
+
+      - name: Upload full Semgrep findings as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-findings
+          path: pretty-pr_branch_results.json
