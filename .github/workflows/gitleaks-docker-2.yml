@@ -42,7 +42,7 @@ jobs:
           PR_NUMBER="${{ github.event.pull_request.number }}"
           MAX=10
           if [ "$COUNT" -gt 0 ]; then
-            COMMENT="**🔐 Gitleaks Findings: $COUNT issue(s) detected**\n\n"
+            COMMENT="**🔐 Gitleaks Docker Findings: $COUNT issue(s) detected**\n\n"
             i=0
             while [ "$i" -lt "$COUNT" ] && [ "$i" -lt "$MAX" ]; do
               ITEM=$(echo "$FINDINGS_JSON" | jq ".[$i]")
