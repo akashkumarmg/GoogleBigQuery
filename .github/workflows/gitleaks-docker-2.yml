@@ -27,10 +27,9 @@ jobs:
           echo "Running Gitleaks scan..."
           docker run \
             -v ${{ github.workspace }}:/repo \
-            -w /repo \
             -e GITLEAKS_LICENSE=$GITLEAKS_LICENSE \
             zricethezav/gitleaks:latest \
-            detect --source=. --verbose --exit-code=0 --report-format=json --report-path=gitleaks-results.json || true
+            detect --verbose --exit-code=0 --report-format=json --report-path=gitleaks-results.json || true
           cat gitleaks-results.json
             
       - name: Format and comment findings on PR
