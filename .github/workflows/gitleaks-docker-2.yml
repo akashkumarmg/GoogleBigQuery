@@ -31,6 +31,7 @@ jobs:
             -e GITLEAKS_LICENSE=$GITLEAKS_LICENSE \
             zricethezav/gitleaks:latest \
             detect --source=. --verbose --exit-code=0 --report-format=json --report-path=gitleaks-results.json || true
+          cat gitleaks-results.json
             
       - name: Format and comment findings on PR
         env:
