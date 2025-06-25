@@ -1,4 +1,4 @@
-name: Semgrep Diff Scan new 
+name: Semgrep Diff Scan latest
 
 on:
   pull_request:
