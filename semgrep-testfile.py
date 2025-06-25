@@ -1,27 +1,45 @@
-import pickle
 import os
+import subprocess
+import sqlite3
+from flask import Flask, request
 
-# :rotating_light: Hardcoded secret
-API_KEY = "sk_test_51H8zP5XkGzFakeSecretKeyForSemgrepTesting"
+app = Flask(__name__)
 
-def execute_user_input():
-    user_input = input("Enter code to execute: ")
-    # :rotating_light: Dangerous use of eval
-    result = eval(user_input)
-    print(f"Result: {result}")
+# 1. Hardcoded secret (High severity)
+API_KEY = "1234567890abcdef"
 
-def insecure_deserialization():
-    data = b"some malicious pickle string"
-    # :rotating_light: Unsafe deserialization
-    obj = pickle.loads(data)
-    print("Deserialized:", obj)
+# 2. Insecure subprocess call (Command Injection)
+@app.route('/ping')
+def ping():
+    host = request.args.get('host')
+    return subprocess.check_output("ping -c 1 " + host, shell=True)
 
-def insecure_command_execution():
-    filename = input("Enter filename: ")
-    # :rotating_light: Unsafe os.system usage
-    os.system("cat " + filename)
+# 3. SQL Injection vulnerability
+@app.route('/user')
+def get_user():
+    username = request.args.get('username')
+    conn = sqlite3.connect('users.db')
+    cursor = conn.cursor()
+    query = f"SELECT * FROM users WHERE username = '{username}'"
+    cursor.execute(query)
+    result = cursor.fetchall()
+    return str(result)
 
-if __name__ == "__main__":
-    execute_user_input()
-    insecure_deserialization()
-    insecure_command_execution()
+# 4. Use of eval() with user input
+@app.route('/calc')
+def calc():
+    expr = request.args.get('expr')
+    return str(eval(expr))  # Dangerous
+
+# 5. Insecure deserialization using pickle
+import pickle
+@app.route('/load')
+def load_data():
+    data = request.args.get('data')
+    return pickle.loads(bytes(data, 'utf-8'))  # Unsafe
+
+# 6. Insecure random generator for security tokens
+import random
+@app.route('/token')
+def get_token():
+    return str(random.randint(100000, 999999))  # Not secure
