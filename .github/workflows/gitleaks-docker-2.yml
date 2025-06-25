@@ -20,21 +20,10 @@ jobs:
         with:
           fetch-depth: 0  # Required to get full commit history for diffing
 
-      - name: Download gitleaks.toml config file
-        env:
-          GH_TOKEN: ${{ secrets.REPO_PAT_SERVICE_IT }}
-        run: |
-          mkdir -p Rules
-          content=$(gh api -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            /repos/skyflowapi/.github-private/contents/Rules/gitleaks.toml --jq '.content')
-          echo "$content" | base64 -d > Rules/gitleaks.toml
-          
       - name: Get base and head commit SHAs
         run: |
           echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> $GITHUB_ENV
           echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
-
   
       - name: Run Gitleaks on PR changes via Docker
         run: |
