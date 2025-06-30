@@ -2717,9 +2717,11 @@ description = "Identified a Private Key, which may compromise cryptographic secu
 regex = '''(?i)-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----[\s\S-]{64,}?KEY(?: BLOCK)?-----'''
 keywords = ["-----begin"]
 
-[rules.allowlist]
+[[rules.allowlist]]
+paths = []
 regexes = [
-  '''(?i)-----BEGIN (TEST|EXAMPLE|EXCLUDE) PRIVATE KEY-----[\s\S]*?-----END (TEST|EXAMPLE|EXCLUDE) PRIVATE KEY-----'''
+  '''#.*-----BEGIN .*PRIVATE KEY-----''',
+  '''-----BEGIN (TEST|EXAMPLE).*PRIVATE KEY-----''',
 ]
 
 [[rules]]
