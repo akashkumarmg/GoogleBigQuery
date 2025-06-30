@@ -15,6 +15,6 @@ SENSITIVE_SERVER="192.168.1.100"
 # Using curl with insecure SSL verification (Vulnerability 5)
 curl -k -X GET "https://example.com/api/data"
 
-#-----BEGIN PRIVATE KEY----- 
-#... 
-#-----END PRIVATE KEY-----
+#  -----BEGIN PRIVATE KEY----- 
+#  ... 
+#  -----END PRIVATE KEY-----
