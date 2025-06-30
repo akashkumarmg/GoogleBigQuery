@@ -2720,7 +2720,7 @@ keywords = ["-----begin"]
 
 [rules.allowlist]
 regexes = [
-  '''(?i)(?:^\s*#\s*-----BEGIN (?:TEST|EXAMPLE|EXCLUDE) PRIVATE KEY-----[\s\S]*?^\s*#\s*-----END (?:TEST|EXAMPLE|EXCLUDE) PRIVATE KEY-----\s*)'''
+  '''(?i)\s*-----BEGIN (?:TEST|EXAMPLE|EXCLUDE) PRIVATE KEY-----[\s\S]*?-----END (?:TEST|EXAMPLE|EXCLUDE) PRIVATE KEY-----'''
 ]
 
 [[rules]]
