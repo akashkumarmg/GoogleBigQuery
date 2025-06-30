@@ -2721,6 +2721,14 @@ keywords = ["-----begin"]
 regexTarget = "line"
 regexes = [ '''^\s*#.*''' ]
 
+[[rules.allowlists]]
+regexTarget = "line"
+regexes = [ '''-----BEGIN TEST PRIVATE KEY-----''' ]
+
+[[rules.allowlists]]
+regexTarget = "line"
+regexes = [ '''-----BEGIN OPENSSH PRIVATE KEY-----''' ]
+
 [[rules]]
 id = "privateai-api-token"
 description = "Identified a PrivateAI Token, posing a risk of unauthorized access to AI services and data manipulation."
