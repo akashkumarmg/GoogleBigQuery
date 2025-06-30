@@ -2718,14 +2718,6 @@ regex = '''(?i)-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----[\s\S-]{64
 keywords = ["-----begin"]
 
 [[rules.allowlists]]
-regexTarget = "match"
-regexes = [ '''-----BEGIN\s*(TEST|EXAMPLE)\s*PRIVATE\s*KEY.*?-----END\s*(TEST|EXAMPLE)\s*PRIVATE\s*KEY''' ]
-
-[[rules.allowlists]]
-regexTarget = "match"
-regexes = [ '''-----BEGIN\s*(TEST|EXAMPLE).*?PRIVATE.*?KEY''' ]
-
-[[rules.allowlists]]
 regexTarget = "line"
 regexes = [ '''^\s*#.*''' ]
 
