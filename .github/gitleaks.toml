@@ -2719,7 +2719,7 @@ keywords = ["-----begin"]
 
 [rules.allowlist]
 regexes = [
-  '''(?im)^(\s*#\s*-----BEGIN [A-Z ]+KEY-----\s*\n(?:\s*#.*\n)*?\s*#\s*-----END [A-Z ]+KEY-----\s*)$'''
+  '''(?im)^(\s*#\s*-----BEGIN (?:TEST|EXAMPLE|EXCLUDE) PRIVATE KEY-----\s*\n(?:\s*#.*\n)*?\s*#\s*-----END (?:TEST|EXAMPLE|EXCLUDE) PRIVATE KEY-----\s*)$'''
 ]
 
 [[rules]]
