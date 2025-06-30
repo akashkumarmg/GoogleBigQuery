@@ -29,6 +29,7 @@ regexes = [
     '''^@(?:[A-Z_]+|[a-z_]+)@$''',
     '''^/Users/(?i)[a-z0-9]+/[\w .-/]+$''',
     '''^/(?:bin|etc|home|opt|tmp|usr|var)/[\w ./-]+$''',
+    '''(?i)^#.*-----BEGIN [A-Z ]*PRIVATE KEY-----'''
 ]
 paths = [
     '''gitleaks\.toml''',
