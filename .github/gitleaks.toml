@@ -2719,7 +2719,7 @@ keywords = ["-----begin"]
 
 [[rules.allowlists]]
 regexTarget = "match"
-regexes = [ '''-----BEGIN\s*(TEST|EXAMPLE)\s*PRIVATE\s*KEY.*?-----END\s*(TEST|EXAMPLE)\s*PRIVATE\s*KEY''' ]
+regexes = [ '''-----BEGIN\s*(TEST|EXAMPLE).*?PRIVATE\s*KEY[\s\S]*-----END\s*(TEST|EXAMPLE).*?PRIVATE\s*KEY''' ]
 
 [[rules]]
 id = "privateai-api-token"
