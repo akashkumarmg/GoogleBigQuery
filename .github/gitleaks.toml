@@ -2720,8 +2720,8 @@ keywords = ["-----begin"]
 [[rules.allowlist]]
 paths = []
 regexes = [
-  '''#.*-----BEGIN .*PRIVATE KEY-----''',
-  '''-----BEGIN (TEST|EXAMPLE).*PRIVATE KEY-----''',
+  '''#\s*-----BEGIN\s*[A-Z0-9_-]{0,100}PRIVATE\s*KEY.*?-----END\s*[A-Z0-9_-]{0,100}PRIVATE\s*KEY''',
+  '''-----BEGIN\s*(TEST|EXAMPLE).*?PRIVATE\s*KEY.*?-----END\s*(TEST|EXAMPLE).*?PRIVATE\s*KEY''',
 ]
 
 [[rules]]
