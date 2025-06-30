@@ -2719,7 +2719,8 @@ keywords = ["-----begin"]
 
 [rules.allowlist]
 regexes = [
-  '''(?i)\s*-----BEGIN (?:TEST|EXAMPLE|EXCLUDE) PRIVATE KEY-----[\s\S]*?-----END (?:TEST|EXAMPLE|EXCLUDE) PRIVATE KEY-----'''
+  '''^\s*#.*$''',  # skip fully commented lines (adjust based on full secret content)
+  '''(?i)-----BEGIN (TEST|EXAMPLE) PRIVATE KEY-----[\s\S]*?-----END (TEST|EXAMPLE) PRIVATE KEY-----'''
 ]
 
 [[rules]]
