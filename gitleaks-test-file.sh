@@ -17,3 +17,8 @@
     #    -----BEGIN OPENSSH PRIVATE KEY-----
     #    ...
     #    -----END OPENSSH PRIVATE KEY-----
+    
+    
+    #    -----BEGIN TEST PRIVATE KEY-----
+    #    ...
+    #    -----END TEST PRIVATE KEY-----
