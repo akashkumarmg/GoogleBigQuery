@@ -18,7 +18,3 @@ curl -k -X GET "https://example.com/api/data"
 #-----BEGIN PRIVATE KEY----- 
 #... 
 #-----END PRIVATE KEY-----
-
------BEGIN PRIVATE KEY----- 
-... 
------END PRIVATE KEY-----
