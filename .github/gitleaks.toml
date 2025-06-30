@@ -2720,8 +2720,20 @@ keywords = ["-----begin"]
 [[rules.allowlists]]
 paths = []
 regexes = [
-  '''-----.*?BEGIN.*?(TEST|EXAMPLE).*?PRIVATE.*?KEY.*?-----.*?END.*?PRIVATE.*?KEY''',
+  '''-----BEGIN\s*(TEST|EXAMPLE).*?PRIVATE\s*KEY|TEST\s*-----BEGIN\s*PRIVATE\s*KEY|EXAMPLE\s*-----BEGIN\s*PRIVATE\s*KEY|-----BEGIN\s*PRIVATE\s*KEY.*?TEST|-----BEGIN\s*PRIVATE\s*KEY.*?EXAMPLE''',
 ]
+commits = []
+stopwords = []
+
+[[rules.allowlists]]
+paths = []
+regexes = [
+  '''-----BEGIN\s*(TEST|EXAMPLE).*?PRIVATE\s*KEY''',
+  '''(TEST|EXAMPLE)\s*-----BEGIN\s*PRIVATE\s*KEY''',
+  '''-----BEGIN\s*PRIVATE\s*KEY.*?(TEST|EXAMPLE)''',
+]
+commits = []
+stopwords = []
 
 [[rules]]
 id = "privateai-api-token"
