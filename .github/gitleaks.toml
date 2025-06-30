@@ -2717,6 +2717,11 @@ description = "Identified a Private Key, which may compromise cryptographic secu
 regex = '''(?i)-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----[\s\S-]{64,}?KEY(?: BLOCK)?-----'''
 keywords = ["-----begin"]
 
+[rules.allowlist]
+regexes = [
+  '''(?im)^(\s*#\s*-----BEGIN (?:TEST|EXAMPLE|EXCLUDE) PRIVATE KEY-----\s*\n(?:\s*#.*\n)*?\s*#\s*-----END (?:TEST|EXAMPLE|EXCLUDE) PRIVATE KEY-----\s*)$'''
+]
+
 [[rules]]
 id = "privateai-api-token"
 description = "Identified a PrivateAI Token, posing a risk of unauthorized access to AI services and data manipulation."
