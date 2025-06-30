@@ -18,10 +18,8 @@
     #    4GkxFhD90vcNLYLInFEX6Ppy1tP
     #    -----END OPENSSH PRIVATE KEY-----
 
-    #    -----BEGIN TEST PRIVATE KEY-----
+    #    -----BEGIN test PRIVATE KEY-----
     #    WYzvQwECAwEAAQJAIJLixBy2qpFoS4DSmoEm
     #	   o3qGy0t6z09AIJtH+5OeRV1be+N4cDYJKffGzDa88vQENZiRm0GRq6a+HPGQMd2k
     #	   TQIhAKMSvzIBnni7ot/OSie2TmJLY4SwTQAe
-    #    -----END TEST PRIVATE KEY-----
-
-    12123123
+    #    -----END test PRIVATE KEY-----
