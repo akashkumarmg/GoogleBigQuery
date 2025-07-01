@@ -2722,8 +2722,11 @@ regexTarget = "line"
 regexes = [ '''-----BEGIN TEST PRIVATE KEY-----''' ]
 
 [[rules.allowlists]]
-regexTarget = "line"
-regexes = [ '''-----BEGIN OPENSSH PRIVATE KEY-----''' ]
+regexes = [
+    '''-----BEGIN SSH PRIVATE KEY-----''',
+    '''-----BEGIN EXAMPLE PRIVATE KEY-----''',
+    '''-----BEGIN TESTING PRIVATE KEY-----''',
+]
 
 [[rules]]
 id = "privateai-api-token"
