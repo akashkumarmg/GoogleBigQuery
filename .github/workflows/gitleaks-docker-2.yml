@@ -28,9 +28,10 @@ jobs:
           docker run \
             -v ${{ github.workspace }}:/repo \
             -w /repo \
+            -e GITLEAKS_CONFIG=/repo/.github/gitleaks.toml \
             -e GITLEAKS_LICENSE=$GITLEAKS_LICENSE \
             zricethezav/gitleaks:latest \
-            detect --source=. --verbose --exit-code=0 --report-format=json --report-path=gitleaks-results.json || true
+            detect --source=. --verbose --config=$GITLEAKS_CONFIG --exit-code=0 --report-format=json --report-path=gitleaks-results.json || true
           cat gitleaks-results.json
             
       - name: Format and comment findings on PR
