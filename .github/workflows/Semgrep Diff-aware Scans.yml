@@ -37,7 +37,7 @@ jobs:
           pip install semgrep
 
           # Perform a full scan of the main branch and save results as JSON
-          semgrep --config auto --severity ERROR --json-output=main_branch_results.json
+          semgrep --config auto --json-output=main_branch_results.json
 
           # Extract just the results array for easier handling
           cat main_branch_results.json | jq .results > pretty-main_branch_results.json
@@ -74,7 +74,7 @@ jobs:
           pip install semgrep
 
           # Run Semgrep with diff-aware analysis using the baseline commit SHA
-          semgrep --config auto --baseline-commit "$BASELINE_SHA" --severity ERROR --json-output=pr_branch_results.json
+          semgrep --config auto --baseline-commit "$BASELINE_SHA" --json-output=pr_branch_results.json
 
           # Format results for later parsing and posting
           cat pr_branch_results.json | jq .results > pretty-pr_branch_results.json
