@@ -1223,3 +1223,36 @@ func makeSkyflowAPIRequest[Req any, Resp any](endpoint string, req Req, userEmai
 
     return &skyflowResp, nil
 }
+
+func main() {
+	// ❌ Hardcoded secret (Semgrep ID: go.lang.security.audit.hardcoded-credentials)
+	secretKey := "mySuperSecretPassword123!"
+
+	// ❌ Insecure command execution (Semgrep ID: go.lang.security.audit.os-exec)
+	userInput := "ls -la"
+	cmd := exec.Command("sh", "-c", userInput) // command injection risk
+	output, _ := cmd.CombinedOutput()
+	fmt.Println(string(output))
+
+	// ❌ Insecure hashing algorithm (Semgrep ID: go.lang.security.crypto.use-of-md5)
+	data := []byte("important data")
+	hash := md5.Sum(data)
+	fmt.Printf("MD5 hash: %x\n", hash)
+
+	// ❌ Reading unvalidated input from HTTP request and using in a command
+	http.HandleFunc("/run", func(w http.ResponseWriter, r *http.Request) {
+		cmdParam := r.URL.Query().Get("cmd")
+		out, _ := exec.Command("sh", "-c", cmdParam).Output() // Dangerous
+		w.Write(out)
+	})
+
+	// ❌ Writing sensitive data to world-readable file (Semgrep ID: go.lang.security.audit.file-permissions)
+	ioutil.WriteFile("/tmp/secret.txt", []byte(secretKey), 0666) // overly permissive
+
+	// ❌ Predictable random token generation (Semgrep ID: go.lang.security.crypto.use-of-weak-rng)
+	b := make([]byte, 16)
+	rand.Read(b) // should use crypto/rand, but simulated here
+	fmt.Println("Token:", hex.EncodeToString(b))
+
+	http.ListenAndServe(":8080", nil)
+}
