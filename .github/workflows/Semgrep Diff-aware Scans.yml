@@ -88,7 +88,7 @@ jobs:
           PR_SHA: ${{ env.PR_SHA }}
         run: |
           # Filter out only ERROR severity results
-          PR_FINDINGS=$(jq '[.[] | select(.extra.severity == "ERROR")]' pretty-pr_branch_results.json)
+          PR_FINDINGS=$(jq '[.[] | select(.extra.severity == "WARNING")]' pretty-pr_branch_results.json)
           COUNT=$(echo "$PR_FINDINGS" | jq 'length')
           echo "Total findings: $COUNT"
 
@@ -104,7 +104,7 @@ jobs:
             echo -e "\nShowing first 3 findings below. [Download full JSON report to view all findings from Artifacts in summary.]\n\n---" >> "$COMMENT_FILE"
 
             FINDINGS_ARRAY=$(echo "$PR_FINDINGS" | jq -c '.')
-            MAX_DISPLAY=3
+            MAX_DISPLAY=10
             DISPLAY_COUNT=$((COUNT < MAX_DISPLAY ? COUNT : MAX_DISPLAY))
 
             # Loop through and format the top 3 findings for display
